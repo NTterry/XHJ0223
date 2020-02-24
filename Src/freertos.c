@@ -102,7 +102,7 @@ void MX_FREERTOS_Init() {
 
   /* Create the thread(s) */
   /* 按键检测 喂狗 其他任务 */
-  osThreadDef(NomalTask, StartDefaultTask, osPriorityNormal, 0, 768);
+  osThreadDef(NomalTask, StartDefaultTask, osPriorityNormal, 0, 1024);
   NomalTaskHandle = osThreadCreate(osThread(NomalTask), NULL);
   
   /* 主工作任务*/

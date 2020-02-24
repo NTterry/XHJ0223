@@ -175,7 +175,8 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
+extern void KeySta_Poll(void);
+extern void keyInit(void);
 void StartDefaultTask(void const * argument)
 {
     uint32_t i = 0;
@@ -186,6 +187,7 @@ void StartDefaultTask(void const * argument)
 	osDelay(100);
 	ModbusData_Init();
 	GUI_Init();
+	keyInit();
 	
 #if (WCH_DOG == 1)
 	/* USER CODE BEGIN 2 */
@@ -201,15 +203,15 @@ void StartDefaultTask(void const * argument)
 	for(;;)										// 10ms per ticks
 	{
 		i++;
-		KeyStatus();	
-
+//		KeyStatus();	
+		KeySta_Poll();
 		if((i % 13) == 1)				/*GUI刷新*/
 			Task_GUI_Function();	
 		
 		if((i % 17) == 1)	
 			Speed_Send();   /*定时向刹车板发送速度信号*/
 		
-printf("Fq %d\t",Get_FRQE2());		
+//printf("Fq %d\t",Get_FRQE2());		
 
 		osDelay(10);
         

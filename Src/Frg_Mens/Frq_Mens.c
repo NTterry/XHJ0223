@@ -98,7 +98,7 @@ void ICOverLoadIRQ(void)
 		
 		frg_mens.pre_tim = frg_mens.last_tim;
 		
-		Log_e("over");
+//		Log_e("over");
 	}
 	else
 	{

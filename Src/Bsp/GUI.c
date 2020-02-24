@@ -6,7 +6,7 @@
 #include "EEPROM.h"
 #include "Hangtu.h"
 #include "u_log.h"
-
+#include "keyboard.h"
 #define VERSION     19     					/*版本号 C97  2019.9.17*/
 
 extern struct SYSATTR sys_attr;				/* 系统参数  */
@@ -1434,4 +1434,113 @@ void CmdProc(void)
 			savecnt = 10;
 			break;
 	}
+}
+
+
+/**
+* Key init function
+* @param none
+* @return none
+*/
+
+void Key_HighUp(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_HighDw(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_LiheUp(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_LiheDw(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Set(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Add(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Sub(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_ModLong(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_TBrkLong(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_TLhLong(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_StartLong(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Start(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Dd(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Zd(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Stop(void)
+{
+	IOT_FUNC_ENTRY;
+}
+void Key_Liu(void)
+{
+	IOT_FUNC_ENTRY;
+}
+
+
+
+
+#define GPIO_KEY_NUM 16 					///< Defines the total number of key member
+static keyTypedef_t DsingleKey[GPIO_KEY_NUM]; 	///< Defines a single key member array pointer
+keysTypedef_t keys;  
+
+
+void keyInit(void)
+{
+    DsingleKey[0] = keyInitOne(GPIO_PIN_RESET, GPIOA, GPIO_PIN_4, Key_HighUp,    0);     //KEYUP
+    DsingleKey[1] = keyInitOne(GPIO_PIN_RESET, GPIOA, GPIO_PIN_5,  Key_HighDw,     0);   //KEY_HDW
+    DsingleKey[2] = keyInitOne(GPIO_PIN_RESET, GPIOA, GPIO_PIN_6,  Key_LiheUp,    0);    //KEY_LUP
+    DsingleKey[3] = keyInitOne(GPIO_PIN_RESET, GPIOA, GPIO_PIN_7,  Key_LiheDw,    0);    //KEY_LDW
+    DsingleKey[4] = keyInitOne(GPIO_PIN_RESET, GPIOC, GPIO_PIN_4,  Key_Set,   0);     //KEY_SET
+    DsingleKey[5] = keyInitOne(GPIO_PIN_RESET, GPIOC, GPIO_PIN_5,  Key_Add,    0);    //KEY_SUP
+	DsingleKey[6] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_0,  Key_Sub,   0 );    //KEY_SDW
+	DsingleKey[7] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_1,  0,   Key_ModLong );    //KEY_CHG
+	DsingleKey[8] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_2,  0,   Key_TBrkLong );    //KEY_TSC
+	DsingleKey[9] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_9,  0,   Key_TLhLong );    //KEY_TLH
+	DsingleKey[10] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_8,  0,   Key_StartLong );   //KEY_START
+	
+	DsingleKey[11] = keyInitOne(GPIO_PIN_SET, GPIOB, GPIO_PIN_14,  Key_Dd,   0 );   //KEY_DD
+	DsingleKey[12] = keyInitOne(GPIO_PIN_SET, GPIOA, GPIO_PIN_3,  Key_Zd,   0 );    //KEY_ZD
+	DsingleKey[13] = keyInitOne(GPIO_PIN_SET, GPIOB, GPIO_PIN_15,  Key_Liu,   0 );   //KEY_LIU
+//	DsingleKey[14] = keyInitOne(NULL, GPIOB, GPIO_PIN_13,  Key_Stop,   0 );   //KEY_STOP
+	
+	
+    keys.singleKey = (keyTypedef_t *)&DsingleKey;
+    keyParaInit(&keys); 
+}
+
+void KeySta_Poll(void)
+{
+	keyHandle((keysTypedef_t *)&keys);
 }
