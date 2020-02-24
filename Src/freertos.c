@@ -129,6 +129,7 @@ void StartTask03(void const * argument)
 	SYS_STA status;
 	
 	osDelay(1000);
+	
 	for(;;)
 	{
 		/*有探头一键启动模式*/

@@ -47,6 +47,7 @@
 #include "Hangtu.h"
 #include "u_log.h"
 #include "Encoder.h"
+#include "Frq_Mens.h"
 /* USER CODE BEGIN Includes */
 uint16_t led_sta;
 /* USER CODE END Includes */
@@ -194,7 +195,8 @@ void StartDefaultTask(void const * argument)
 #endif
 	
 	/* USER CODE END 2 */
-	HAL_TIM_Base_Start(&htim2);	//开启计数
+//	HAL_TIM_Base_Start(&htim2);	//开启计数
+	IC_Mens_Init();
   /* Infinite loop */
 	for(;;)										// 10ms per ticks
 	{
@@ -206,7 +208,9 @@ void StartDefaultTask(void const * argument)
 		
 		if((i % 17) == 1)	
 			Speed_Send();   /*定时向刹车板发送速度信号*/
-			
+		
+printf("Fq %d\t",Get_FRQE2());		
+
 		osDelay(10);
         
 		/*显示主机是否开启，参数待定*/

@@ -106,51 +106,6 @@ int GetEncoderLen2Cm(void)
 	return ret;
 }
 
-//void GetEncode(uint32_t dir, struct EncoderCnt *p)
-//{
-//	if(dir)
-//	{
-//		p->TotalCount = -sys_encoder.TotalCount/4;
-//        p->Speed = -sys_encoder.Speed;					/*速度已经除以4,10倍的脉冲速度*/
-//	}
-//	else
-//	{
-//		p->TotalCount = sys_encoder.TotalCount/4;
-//		p->Speed = sys_encoder.Speed;
-//	}
-//}
-
-/**
-  * 函数功能：编码器计数清零
-  * 输入参数：
-  *           *p:硬件编码器计数数据,打桩计数器  和 夯土计数器
-  * 返回值: None
-  * 说明: 
-  */
-//void inline EncoderClr(struct EncoderCnt *p)
-//{
-//	p->TotalCount = 0;
-//	sys_stadata.m_high.TotalCount = 0;
-//}
-
-
-
-///*一键启动时，识别锤的方向*/
-//void CheckDir(struct EncoderCnt *p)
-//{
-//	if((p->Speed < 0) && (p->TotalCount < 0))
-//	{
-//		if(sys_attr.s_dir == 0)
-//			sys_attr.s_dir = 1;
-//		else
-//			sys_attr.s_dir = 0;
-//	}
-
-//	savecnt = 4;
-//	Debug("T%d,S%d,D%d",p->TotalCount,p->Speed,sys_attr.s_dir);
-//}
-
-
 /********************************************************
 Function	: PICtr()
 Description	: 对松弛度的误差进行PI控制，齿数
@@ -424,13 +379,7 @@ SYS_STA takeup(void)
 			}
 			
 			if(getmilsec(ctime) > 5000)						//拉离合后3秒后，离合还是反转，则报故障
-			{
-//				if(Get_Fbsignal(FB_LIHE) == 0)				//离合无信号
-//					status |= ERR_LH;						//离合线路故障
-////				else if(Get_Fbsignal(FB_SHACHE) != 1)  		//1为松刹车
-////					status |= ERR_SC;						//刹车线路故障
-//				else
-				
+			{				
 				if(sys_stadata.m_power.Speed < (sys_attr.s_pnull / 2))
 					status |= ERR_CT;						//主机未启动或互感器损坏
 				else
@@ -705,6 +654,7 @@ SYS_STA putdown(int32_t delay)
 	uint32_t ctime;
 	int32_t tmp;
 	
+	IOT_FUNC_ENTRY;
 	G_LIHE(ACT_OFF,0);
 	status = ERR_NONE;
 	
@@ -759,7 +709,7 @@ SYS_STA putdown(int32_t delay)
 		
 	}while(0);
 	
-	return status;
+	IOT_FUNC_EXIT_RC(status);
 }
 
 
@@ -869,7 +819,6 @@ void FB_CHECK(void)
 			sys_fbsta |= FB_RUN;
 			clear_all();
 		}
-		
 	}
 	else
 	{
