@@ -4,7 +4,9 @@
 #include "GUI.h"
 #include "Encoder.h"
 #include "u_log.h"
+#include "SingleAct.h"
 
+extern struct SIG_ACT_DATA g_st_SigData;
 
 #define GET_TICK_MS()  osKernelSysTick()
 #define DELAYMS(x)	   osDelay(x)
@@ -23,8 +25,14 @@ extern uint16_t g_errnum;
 struct HANGTU s_hang;                                   /*夯土流程状态检测*/
 struct RECORD s_record;									/*待上传的数据*/
 
-extern uint16_t led_sta;
+extern uint16_t g_led_sta;
 
+/*紧急停机处理*/
+void Halt_Stop(void)
+{
+	G_LIHE(ACT_OFF,0);
+	G_SHACHE(ACT_ON,0);
+}
 
 /*计算当前的时间间隔*/
 static uint32_t GET_MS_DIFF(uint32_t pretime)
@@ -42,20 +50,20 @@ static uint32_t GET_MS_DIFF(uint32_t pretime)
 void ModbusData_Init(void)
 {
 	usRegHoldingBuf[M_NUB] = 0;
-	usRegHoldingBuf[M_TIMES] = sys_attr.s_cnt;
-	usRegHoldingBuf[M_THIGH] = sys_attr.s_sethighcm;
+	usRegHoldingBuf[M_TIMES] = g_sys_para.s_cnt;
+	usRegHoldingBuf[M_THIGH] = g_sys_para.s_sethighcm;
 	usRegHoldingBuf[M_DEEP] = 0;
-	usRegHoldingBuf[M_SONGTU] = sys_attr.s_intval;
+	usRegHoldingBuf[M_SONGTU] = g_sys_para.s_intval;
 	usRegHoldingBuf[M_STATE] = 0;
 	usRegHoldingBuf[M_ERR] = 0;
 	
-	usRegHoldingBuf[M_PERCNT] = sys_attr.s_numchi;
-	usRegHoldingBuf[M_ZHOU] = sys_attr.s_zhou;
-	usRegHoldingBuf[M_TLIAO] = sys_attr.s_intval;
-	usRegHoldingBuf[M_CCNUB] = sys_attr.s_cnt;
-	usRegHoldingBuf[M_TICHUI] = sys_attr.s_sethighcm;
-	usRegHoldingBuf[M_LIHE] = sys_attr.s_hlihe;
-	usRegHoldingBuf[M_HPROT] = sys_attr.s_hprot;
+	usRegHoldingBuf[M_PERCNT] = g_sys_para.s_numchi;
+	usRegHoldingBuf[M_ZHOU] = g_sys_para.s_zhou;
+	usRegHoldingBuf[M_TLIAO] = g_sys_para.s_intval;
+	usRegHoldingBuf[M_CCNUB] = g_sys_para.s_cnt;
+	usRegHoldingBuf[M_TICHUI] = g_sys_para.s_sethighcm;
+	usRegHoldingBuf[M_LIHE] = g_sys_para.s_hlihe;
+	usRegHoldingBuf[M_HPROT] = g_sys_para.s_hprot;
 
 	
 	/*授权码*/
@@ -67,24 +75,24 @@ void ModbusData_Init(void)
 	s_record.tim = 0;
 	s_record.cnt = 0;
 }
-extern volatile struct GUI_DATA	g_showdata;
+extern volatile struct GUI_DATA	g_GuiData;
 void ModbusData_flash(void)
 {
-	usRegHoldingBuf[M_PERCNT] = g_showdata.g_num;
-	usRegHoldingBuf[M_ZHOU] = g_showdata.g_Zhoucm;
-	usRegHoldingBuf[M_TLIAO] = g_showdata.g_ts;
-	usRegHoldingBuf[M_CCNUB] = g_showdata.g_hcnt;
-	usRegHoldingBuf[M_TIMES] = g_showdata.g_hcnt;
+	usRegHoldingBuf[M_PERCNT] = g_GuiData.g_num;
+	usRegHoldingBuf[M_ZHOU] = g_GuiData.g_Zhoucm;
+	usRegHoldingBuf[M_TLIAO] = g_GuiData.g_ts;
+	usRegHoldingBuf[M_CCNUB] = g_GuiData.g_hcnt;
+	usRegHoldingBuf[M_TIMES] = g_GuiData.g_hcnt;
 	
-	usRegHoldingBuf[M_TICHUI] = g_showdata.g_sethighcm;
-	usRegHoldingBuf[M_LIHE] = g_showdata.g_lihe;
-	usRegHoldingBuf[M_HPROT] = g_showdata.g_HighOvercm;
+	usRegHoldingBuf[M_TICHUI] = g_GuiData.g_sethighcm;
+	usRegHoldingBuf[M_LIHE] = g_GuiData.g_lihe;
+	usRegHoldingBuf[M_HPROT] = g_GuiData.g_HighOvercm;
 }
 
 void ModbusData_Show(void)
 {
-	usRegHoldingBuf[M_DEEP] = (int16_t)g_showdata.g_nhigh;
-	usRegHoldingBuf[M_THIGH] = (int16_t)g_showdata.g_sethighcm;
+	usRegHoldingBuf[M_DEEP] = (int16_t)g_GuiData.g_nhigh;
+	usRegHoldingBuf[M_THIGH] = (int16_t)g_GuiData.g_sethighcm;
 	usRegHoldingBuf[M_KS] = s_hang.last_downnum;						/*显示桩底深度*/
 	usRegHoldingBuf[M_ERR] = g_errnum;
 }
@@ -95,109 +103,109 @@ extern uint32_t savecnt;
 void ModbusData_Chk(void)
 {
 	/*每圈齿数*/
-	if(usRegHoldingBuf[M_PERCNT] != g_showdata.g_num )
+	if(usRegHoldingBuf[M_PERCNT] != g_GuiData.g_num )
 	{
 		if((usRegHoldingBuf[M_PERCNT] < 300) && (usRegHoldingBuf[M_PERCNT] > 10))
 		{
-			g_showdata.g_num  = usRegHoldingBuf[M_PERCNT];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_num  = usRegHoldingBuf[M_PERCNT];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_PERCNT] = g_showdata.g_num;
+			usRegHoldingBuf[M_PERCNT] = g_GuiData.g_num;
 		}
 	}
 	/*卷筒周长*/
-	if(usRegHoldingBuf[M_ZHOU] != g_showdata.g_Zhoucm)
+	if(usRegHoldingBuf[M_ZHOU] != g_GuiData.g_Zhoucm)
 	{
 		if((usRegHoldingBuf[M_ZHOU] < 300) && (usRegHoldingBuf[M_ZHOU] > 20))
 		{
-			g_showdata.g_Zhoucm = usRegHoldingBuf[M_ZHOU];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_Zhoucm = usRegHoldingBuf[M_ZHOU];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_ZHOU] = g_showdata.g_Zhoucm;
+			usRegHoldingBuf[M_ZHOU] = g_GuiData.g_Zhoucm;
 		}
 	}
 	/*送料的时间*/
-	if(usRegHoldingBuf[M_TLIAO] != g_showdata.g_ts)
+	if(usRegHoldingBuf[M_TLIAO] != g_GuiData.g_ts)
 	{
 		if((usRegHoldingBuf[M_TLIAO] < 16) && (usRegHoldingBuf[M_TLIAO] > 1))
 		{
-			g_showdata.g_ts = usRegHoldingBuf[M_TLIAO];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_ts = usRegHoldingBuf[M_TLIAO];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_TLIAO] = g_showdata.g_ts;
+			usRegHoldingBuf[M_TLIAO] = g_GuiData.g_ts;
 		}
 	}
 	/*设定打锤的次数*/
-	if(usRegHoldingBuf[M_CCNUB] != g_showdata.g_hcnt)
+	if(usRegHoldingBuf[M_CCNUB] != g_GuiData.g_hcnt)
 	{
 		if((usRegHoldingBuf[M_CCNUB] < 11) && (usRegHoldingBuf[M_CCNUB] > 2))
 		{
-			g_showdata.g_hcnt = usRegHoldingBuf[M_CCNUB];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_hcnt = usRegHoldingBuf[M_CCNUB];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_CCNUB] = g_showdata.g_hcnt;
+			usRegHoldingBuf[M_CCNUB] = g_GuiData.g_hcnt;
 		}
 	}
 	/*设定提锤高度*/
-	if(usRegHoldingBuf[M_TICHUI] != g_showdata.g_sethighcm)
+	if(usRegHoldingBuf[M_TICHUI] != g_GuiData.g_sethighcm)
 	{
 		if((usRegHoldingBuf[M_TICHUI] <= MAXSET_HIGH) && (usRegHoldingBuf[M_TICHUI] > MINSET_HIGH))
 		{
-			g_showdata.g_sethighcm = usRegHoldingBuf[M_TICHUI];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_sethighcm = usRegHoldingBuf[M_TICHUI];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_TICHUI] = g_showdata.g_sethighcm;
+			usRegHoldingBuf[M_TICHUI] = g_GuiData.g_sethighcm;
 		}
 	}
 	/*设定离合点的位置*/
-	if(usRegHoldingBuf[M_LIHE] != g_showdata.g_lihe)
+	if(usRegHoldingBuf[M_LIHE] != g_GuiData.g_lihe)
 	{
-		if((usRegHoldingBuf[M_LIHE] <= (g_showdata.g_sethighcm - 20)))
+		if((usRegHoldingBuf[M_LIHE] <= (g_GuiData.g_sethighcm - 20)))
 		{
-			g_showdata.g_lihe = usRegHoldingBuf[M_LIHE];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_lihe = usRegHoldingBuf[M_LIHE];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_LIHE] = g_showdata.g_lihe;
+			usRegHoldingBuf[M_LIHE] = g_GuiData.g_lihe;
 		}
 	}
 	
 	/*设定上拉高度保护值*/
-	if(usRegHoldingBuf[M_HPROT] != g_showdata.g_HighOvercm)
+	if(usRegHoldingBuf[M_HPROT] != g_GuiData.g_HighOvercm)
 	{
 		if(usRegHoldingBuf[M_HPROT] <= 1000)
 		{
-			g_showdata.g_HighOvercm = usRegHoldingBuf[M_HPROT];
-			g_showdata.g_HasChanged = 2;
+			g_GuiData.g_HighOvercm = usRegHoldingBuf[M_HPROT];
+			g_GuiData.g_HasChanged = 2;
 		}
 		else
 		{
-			usRegHoldingBuf[M_HPROT] = g_showdata.g_HighOvercm;
+			usRegHoldingBuf[M_HPROT] = g_GuiData.g_HighOvercm;
 		}
 	}
 	
 		/*分段打锤次数*/
-	g_showdata.s_high1 = usRegHoldingBuf[M_HIGH1];
-	g_showdata.s_cnt1 = usRegHoldingBuf[M_CNT1];
-	g_showdata.s_high2 = usRegHoldingBuf[M_HIGH2];
-	g_showdata.s_cnt2 = usRegHoldingBuf[M_CNT2];
+	g_GuiData.s_high1 = usRegHoldingBuf[M_HIGH1];
+	g_GuiData.s_cnt1 = usRegHoldingBuf[M_CNT1];
+	g_GuiData.s_high2 = usRegHoldingBuf[M_HIGH2];
+	g_GuiData.s_cnt2 = usRegHoldingBuf[M_CNT2];
 }
 
 /*Led状态指示灯  夯土模式下*/
 void LedSta_Show(uint8_t ledsta)
 {
-	led_sta &= ~SIG_SALL;					/*Led灯清零*/
+	LED_BIT_CLR(SIG_SALL);					/*Led灯清零*/
 	switch(ledsta)
 	{
 		case S_IDLE:		/*空闲*/
@@ -205,24 +213,24 @@ void LedSta_Show(uint8_t ledsta)
 			break;
 		case S_PULSE:
 		case S_TICHUI:		/*提锤*/
-			led_sta |= SIG_STICHUI;
+			LED_BIT_SET(SIG_STICHUI);
 			usRegHoldingBuf[M_STATE] = 3;
 			break;
 		case S_CHECK_UPSTOP:
-			led_sta |= SIG_SZHUCHUI;
+			LED_BIT_SET(SIG_SZHUCHUI);
 			usRegHoldingBuf[M_STATE] = 4;
 			break;
 		case S_XIALIAO:		/*下料*/
-			led_sta |= SIG_STU;
+			LED_BIT_SET(SIG_STU);
 			usRegHoldingBuf[M_STATE] = 5;
 			break;
 		case S_DELAY2:
 		case S_LIUF:		/*溜放*/
-			led_sta |= SIG_SLIUF;
+			LED_BIT_SET(SIG_SLIUF);
 			usRegHoldingBuf[M_STATE] = 1;
 			break;
 		case S_DACHUI:		/*夯土*/
-			led_sta |= SIG_SHANGTU;
+			LED_BIT_SET(SIG_SHANGTU);
 			usRegHoldingBuf[M_STATE] = 2;
 			break;
 		default:break;
@@ -231,33 +239,117 @@ void LedSta_Show(uint8_t ledsta)
 
 
 /*控制的主任务*/
-extern uint32_t g_erract;    
+
+
+void EXT_BUTTON_CHK(void)
+{
+	static uint8_t b_Dd;
+	static uint8_t k_Cluch;
+	static uint8_t k_Brk;
+	static uint16_t b_Zd;
+	
+	b_Dd <<= 1;
+	b_Zd <<= 1;
+	k_Cluch <<= 1;
+	k_Brk <<= 1;
+	
+	if(KEY_DD == GPIO_PIN_SET)
+		b_Dd |= 0x01;
+	if(KEY_ZD == GPIO_PIN_SET)
+		b_Zd |= 0x01;
+	if(KEY_TLH == GPIO_PIN_RESET)
+		k_Cluch |= 0x01;
+	if(KEY_TSC == GPIO_PIN_RESET)
+		k_Brk |= 0x01;
+		
+	if(b_Dd == 0xFF)
+	{
+		IOT_FUNC_ENTRY;
+		if(g_sys_para.s_cmode == MOD_FREE)
+			g_sys_para.s_cmode = MOD_MAN;
+	}
+	else
+	{
+		if(g_sys_para.s_cmode == MOD_MAN)
+			g_sys_para.s_cmode = MOD_MANOFF;
+	}
+	
+	if(b_Zd == 0xFFFF)
+	{
+		IOT_FUNC_ENTRY;
+		if(g_sys_para.s_cmode == MOD_FREE)
+		{
+			b_Zd = 0;
+			if(g_sys_para.s_mode == 0)
+				g_sys_para.s_cmode = MOD_SIGACT;
+		}
+		else if(g_sys_para.s_cmode != MOD_FREE)
+		{
+			b_Zd = 0;
+			g_sys_para.s_cmode = MOD_FREE;
+		}
+	}
+	
+	if((k_Cluch == 0xFF) || (k_Brk == 0xFF))
+	{
+		IOT_FUNC_ENTRY;
+		if(g_sys_para.s_cmode == MOD_FREE)
+		{
+			g_sys_para.s_cmode = MOD_TST;
+		}
+		
+		if(k_Cluch == 0xFF)
+			G_LIHE(ACT_ON,0);
+		else
+			G_LIHE(ACT_OFF,0);
+			
+		if(k_Brk == 0xFF)
+			G_SHACHE(ACT_OFF,0);
+		else
+			G_SHACHE(ACT_ON,0);
+	}
+	else
+	{
+		if(g_sys_para.s_cmode == MOD_TST)
+		{
+			g_sys_para.s_cmode = MOD_FREE;
+			G_LIHE(ACT_OFF,0);G_SHACHE(ACT_ON,0);
+		}
+	}
+}
+
+
+static enum {
+	e_STEP_READY,
+	e_STEP_STUDY,
+	e_STEP_PULL,
+	e_STEP_DOWN,
+}s_SigActStep;
+
+uint8_t TampStep;
+  
 SYS_STA services(void)
 {
-	static	uint8_t step,down;
+	static	uint8_t s_down;
 	
 	SYS_STA ret;
 	ret = ERR_NONE;
 	
-	if(g_erract | g_errnum)				// 检测离合和刹车是否正常
+	if(g_errnum)				// 检测离合和刹车是否正常
 	{
 	  G_LIHE(ACT_OFF,0);
 	  G_SHACHE(ACT_ON,0);
-	  Log_e("err -- g_erract | g_errnum");
-	  
 	  DELAYMS(ERRDLY);
-	  return g_erract;
+	  return g_errnum;
 	}
+	EXT_BUTTON_CHK();
 	
 	if(!((sys_fbsta & FB_24VOK) && (sys_fbsta & FB_RUN)))	//非正常状态，跳出
 	{
 		G_LIHE(ACT_OFF,0);
 		G_SHACHE(ACT_ON,0);
-		
-		Log_e("FB_24VOK | FB_RUN");
+//		Log_e("FB_24VOK | FB_RUN");
 		DELAYMS(ERRDLY);
-		
-		
 
 		if(!(sys_fbsta & FB_24VOK))
 			return ERR_PW;
@@ -265,95 +357,106 @@ SYS_STA services(void)
 			return ERR_HALT;
 	}
 
-  switch(sys_attr.s_zidong)
-  {
-	  case MOD_TT2:                                         /*有探头的一键启动*/
-	  {
-		  if(step == 0)
-		  {
-			  liheupdate();
-			  led_sta |= SIG_TICHUI;
-			  led_sta &= ~SIG_FANGCHUI;
-			  ret = starttaking();          				/*拉力的学习*/
-			  step = 1;
-		  }
-		  else
-          {
-			  led_sta |= SIG_TICHUI;
-			  led_sta &= ~SIG_FANGCHUI;
-			  ret = takeup();			  
-              Debug("up err %x\r\n",ret);
-          }
+	switch(g_sys_para.s_cmode)
+	{
+		case MOD_SIGACT:     		//自动打锤模式                            
+			switch(s_SigActStep)
+			{
+			case e_STEP_READY:
+				LED_BIT_SET(SIG_TICHUI);
+				LED_BIT_CLR(SIG_FANGCHUI);
+				s_SigActStep = e_STEP_STUDY;
+				Sig_ResetSta();
+				break;
+			case e_STEP_STUDY:
+				ret = Sig_StudyUp();
+				if(ret == ERR_SIG_REACHED)
+				{
+					s_SigActStep = e_STEP_DOWN;
+					Sig_ResetSta();
+					LED_BIT_SET(SIG_FANGCHUI);
+					LED_BIT_CLR(SIG_TICHUI);
+				}
+				break;
+			case e_STEP_PULL:
+				ret = Sig_TakeUp();
+				if(ret == ERR_SIG_REACHED)
+				{
+					s_SigActStep = e_STEP_DOWN;
+					Sig_ResetSta();
+					LED_BIT_SET(SIG_FANGCHUI);
+					LED_BIT_CLR(SIG_TICHUI);
+				}
+				break;
+			case e_STEP_DOWN:
+				ret = Sig_LandDw();
+				if(ret == ERR_SIG_REACHED)
+				{
+					s_SigActStep = e_STEP_PULL;
+					Sig_ResetSta();
+					LED_BIT_SET(SIG_TICHUI);
+					LED_BIT_CLR(SIG_FANGCHUI);
+				}
+				break;
+			 default:ret = ERR_SIG_SOFT;break;
+			}
+			
+			if(ret > ERR_SIG_REACHED)
+			{
+				Halt_Stop();
+				g_sys_para.s_cmode = MOD_FREE;
+			}
+		  break;	
 		  
-		  if(ret == ERR_NONE)
-          {
-			  led_sta &= ~SIG_TICHUI;
-			  led_sta |= SIG_FANGCHUI;
-              ret = putdown(0);	  
-              Debug("down err %d\r\n",ret);
-          }
-		  
-		  if(ret != ERR_NONE)
-		  {
-			 sys_attr.s_zidong = MOD_FREE; 
-			 step = 0;
-		  }
-		  if(g_halt != 0)
-		  {
-			  g_halt = 0;
-		  }
-		  break;
-	  }		
-	  
-	  case MOD_ZTT2:			//正常启动	  夯土模式
-			ret = hangtu(&step);        			/*轮询加堵塞*/
-			/* LED强夯流程显示 */
-			LedSta_Show(step);						/*Led状态显示*/
+	  case MOD_AUTOTAMP:								// 夯土模式
+			ret = hangtu(&TampStep);        			/*轮询无堵塞*/
+			LedSta_Show(TampStep);						/*Led状态显示*/
 		  break;	
 	  case MOD_FREE:
-		  step = 0;
-		  down = 0;
+		  TampStep = 0;s_down = 0;
+		  s_SigActStep = e_STEP_READY;
+		  
 		  G_SHACHE(ACT_ON,0);
-          C_DISCTR();					/* 履带机 取消   Terry 2019.07.04*/
-		  led_sta &= ~SIG_TICHUI;
+          C_DISCTR();					/* 履带机 取消 如果  Terry 2019.07.04*/
+		  LED_BIT_CLR(SIG_TICHUI);
 		  break;
-	  case MOD_MAN:			//手动模式
-		  if(step == 0)
+	  case MOD_MAN:						//手动模式
+		  if(TampStep == 0)
 		  {
-		      led_sta |= SIG_TICHUI;
+		      LED_BIT_SET(SIG_TICHUI);
 			  G_LIHE(ACT_ON,0);
 			  G_SHACHE(ACT_OFF,SHACHEDLY);
-			  step = 1;
+			  TampStep = 1;
 		  }
 		  break;
 	  case MOD_MANOFF:
 		  G_LIHE(ACT_OFF,LIHEDLY);
 		  G_SHACHE(ACT_ON,0);
 		  DELAYMS(200);					/*等待刹车先动作*/
-	      sys_attr.s_zidong = MOD_FREE;
+	      g_sys_para.s_cmode = MOD_FREE;
 		  break;
 	  case MOD_DOWN:						//下放模式  2018.9.7  小夯机未使用
-		  if(down == 0)
+		  if(s_down == 0)
 		  {
 			  G_LIHE(ACT_OFF,LIHEDLY);
 			  G_SHACHE(ACT_OFF,0);
-			  down = 1;
+			  s_down = 1;
 		  }
 		  break;
 		  
 	  case MOD_TST:
 			break;																																			//Terry add 2017.11.16
 	  default:	
-			step = 0;
-			sys_attr.s_zidong = MOD_FREE;
+			TampStep = 0;
+			g_sys_para.s_cmode = MOD_FREE;
 		  break;
 	}
 	
 		
-	if(sys_attr.s_zidong > MOD_DOWN)
-		sys_attr.s_zidong = MOD_FREE;
+	if(g_sys_para.s_cmode > MOD_DOWN)
+		g_sys_para.s_cmode = MOD_FREE;
 		
-	if((sys_attr.s_zidong == MOD_FREE) || (sys_attr.s_zidong == MOD_TST) ||(sys_attr.s_zidong == MOD_DOWN))
+	if((g_sys_para.s_cmode == MOD_FREE) || (g_sys_para.s_cmode == MOD_TST) ||(g_sys_para.s_cmode == MOD_DOWN))
 		DELAYMS(CALUTICK);													//主动让出给其它任务    2017.10.7
 	else
 		DELAYMS(HANG_TICK);
@@ -377,7 +480,7 @@ int Check_Stop(void)
 			break;
 		case 1:
 			LSpeedCm = GetEncoderSpeedCm();
-			if((LSpeedCm < 20) && ((LSpeedCm > -20)) && (sys_stadata.m_power.Speed < power))
+			if((LSpeedCm < 20) && ((LSpeedCm > -20)) && (g_st_SigData.m_Power < power))
 				stop_cnt++;
 			else
 			{
@@ -416,40 +519,40 @@ int Get_Hcnt(int32_t pos)
 {
 	int cnt = 0;
 	
-	cnt = sys_attr.s_cnt;
+	cnt = g_sys_para.s_cnt;
 	
 	/*都为 0 时，跳过*/
 
-	if((g_showdata.s_high1 == 0) && (g_showdata.s_high2 < 0))
+	if((g_GuiData.s_high1 == 0) && (g_GuiData.s_high2 < 0))
 	{
-		if(pos > g_showdata.s_high2 || (g_showdata.s_cnt2 > 0))
-			cnt = g_showdata.s_cnt2;
+		if(pos > g_GuiData.s_high2 || (g_GuiData.s_cnt2 > 0))
+			cnt = g_GuiData.s_cnt2;
 	}
-	else if((g_showdata.s_high1 < 0) && (g_showdata.s_high2 == 0))
+	else if((g_GuiData.s_high1 < 0) && (g_GuiData.s_high2 == 0))
 	{
-		if(pos > g_showdata.s_high1 || (g_showdata.s_cnt1 > 0))
-			cnt = g_showdata.s_cnt1;
+		if(pos > g_GuiData.s_high1 || (g_GuiData.s_cnt1 > 0))
+			cnt = g_GuiData.s_cnt1;
 	}
-	else if(g_showdata.s_high1 > g_showdata.s_high2)
+	else if(g_GuiData.s_high1 > g_GuiData.s_high2)
 	{
-		if((pos > g_showdata.s_high1) && (g_showdata.s_cnt1 > 0))
+		if((pos > g_GuiData.s_high1) && (g_GuiData.s_cnt1 > 0))
 		{
-			cnt = g_showdata.s_cnt1;
+			cnt = g_GuiData.s_cnt1;
 		}
-		else if((pos > g_showdata.s_high2) && (g_showdata.s_cnt2 > 0))
+		else if((pos > g_GuiData.s_high2) && (g_GuiData.s_cnt2 > 0))
 		{
-			cnt = g_showdata.s_cnt2;
+			cnt = g_GuiData.s_cnt2;
 		}
 	}
-	else if(g_showdata.s_high2 > g_showdata.s_high1)
+	else if(g_GuiData.s_high2 > g_GuiData.s_high1)
 	{
-		if((pos > g_showdata.s_high2) && (g_showdata.s_cnt2 > 0))
+		if((pos > g_GuiData.s_high2) && (g_GuiData.s_cnt2 > 0))
 		{
-			cnt = g_showdata.s_cnt2;
+			cnt = g_GuiData.s_cnt2;
 		}
-		else if((pos > g_showdata.s_high1) && (g_showdata.s_cnt1 > 0))
+		else if((pos > g_GuiData.s_high1) && (g_GuiData.s_cnt1 > 0))
 		{
-			cnt = g_showdata.s_cnt1;
+			cnt = g_GuiData.s_cnt1;
 		}
 	}
 	
@@ -531,7 +634,7 @@ SYS_STA hangtu(uint8_t * pst)
                 }
                 /**************************拉力过载保护*********************/
                 tmp = epower(350);	
-                if(sys_stadata.m_power.Speed > tmp)
+                if(g_st_SigData.m_Power > tmp)
                     s_hang.overpow++;
                 else
                     s_hang.overpow = 0;
@@ -543,7 +646,7 @@ SYS_STA hangtu(uint8_t * pst)
                 } 
 				/************************失重保护***************************/
 				tmp = epower(40);
-				if(sys_stadata.m_power.Speed < tmp)
+				if(g_st_SigData.m_Power < tmp)
 					s_hang.lowpow++;
 				else
 				{
@@ -578,7 +681,7 @@ SYS_STA hangtu(uint8_t * pst)
             break;
         case S_XIALIAO:                         				/*  下料  */
 			/*提前执行溜放操作*/
-			if(GET_MS_DIFF(s_hang.pvtimer) > (sys_attr.s_intval * 600 - 200))	
+			if(GET_MS_DIFF(s_hang.pvtimer) > (g_sys_para.s_intval * 600 - 200))	
 			{
 				s_hang.last_highnum = GetEncoderLen2Cm();	/*溜放时的高度  Terry 2019.7.5*/
                 G_LIHE(ACT_OFF,0);
@@ -588,14 +691,14 @@ SYS_STA hangtu(uint8_t * pst)
 			}
             break;
         case S_DELAY2:                          				/*普通延时  刚开始时不需要延时*/
-			if((GET_MS_DIFF(s_hang.pvtimer) > sys_attr.s_intval * 600) || (stlast == S_IDLE))
+			if((GET_MS_DIFF(s_hang.pvtimer) > g_sys_para.s_intval * 600) || (stlast == S_IDLE))
             {
                 C_DISCTR();			/*关闭履带机*/
 				stlast = S_DELAY2;
 				
                 s_hang.pvtimer = GET_TICK_MS();
                 *pst = S_LIUF;
-                Debug("finish xia liao  %ds\r\n",sys_attr.s_intval);
+                Debug("finish xia liao  %ds\r\n",g_sys_para.s_intval);
 				s_hang.liufang_sta = 0;
             }
             break;
@@ -606,9 +709,9 @@ SYS_STA hangtu(uint8_t * pst)
 			
             if(tmp == 1)			/*检测到到底了*/
             {
-                s_hang.dachui_cnt = sys_attr.s_cnt;
-				s_record.high = sys_attr.s_sethighcm / 10;		/*打锤高度 Terry 2019.6.5*/
-				s_record.tim = sys_attr.s_intval;				/*送料时间 Terry 2019.6.5*/
+                s_hang.dachui_cnt = g_sys_para.s_cnt;
+				s_record.high = g_sys_para.s_sethighcm / 10;		/*打锤高度 Terry 2019.6.5*/
+				s_record.tim = g_sys_para.s_intval;				/*送料时间 Terry 2019.6.5*/
 				
                 /*记录当前溜放的深度   */
                 if(GetEncoderLen2Cm() > -40)  				/*下降深度过小  下降0.5米*/
@@ -653,7 +756,7 @@ SYS_STA hangtu(uint8_t * pst)
 					if(s_record.deepth > -50)			/*表示夯土结束  Terry 2019.10.18 */
 					{
 						*pst = S_IDLE;
-						sys_attr.s_zidong = MOD_FREE;	/*直接退出  2019.8.2*/
+						g_sys_para.s_cmode = MOD_FREE;	/*直接退出  2019.8.2*/
 						G_SHACHE(ACT_ON,0);
 						G_LIHE(ACT_OFF,0);
 					}
@@ -677,7 +780,7 @@ SYS_STA hangtu(uint8_t * pst)
     /*异常退出时，立即拉刹车，关闭输送带(莫须有)*/
 	if(ret)
 	{
-		sys_attr.s_zidong = MOD_FREE; 
+		g_sys_para.s_cmode = MOD_FREE; 
 		G_SHACHE(ACT_ON,0);
 		G_LIHE(ACT_OFF,0);					/*2019.8.2添加  Terry*/
 		C_DISCTR();

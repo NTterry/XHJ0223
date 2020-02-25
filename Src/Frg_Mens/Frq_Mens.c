@@ -68,7 +68,16 @@ void ICaptureIRQ(uint32_t ic_val)
 	
 	frg_mens.pre_tim = frg_mens.last_tim;
 	
-	T_lastval = (frg_mens.longtime + T_preval * 3) >> 2;
+	// Soft Filter
+	if(frg_mens.longtime < 300)					//  333Hz
+		T_lastval = (frg_mens.longtime + T_preval * 15) >> 4;
+	else if(frg_mens.longtime < 1000)			// 100Hz
+		T_lastval = (frg_mens.longtime + T_preval * 7) >> 3;
+	else if(frg_mens.longtime < 2000)			// 50Hz
+		T_lastval = (frg_mens.longtime + T_preval * 3) >> 2;
+	else										// < 50Hz
+		T_lastval = (frg_mens.longtime + T_preval) >> 1;
+		
 	T_preval = T_lastval;
 }
 

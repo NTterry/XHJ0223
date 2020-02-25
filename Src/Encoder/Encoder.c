@@ -11,6 +11,7 @@ ENCODER  Encoder1Data;
 static inline void EncoderCacuMs(void);
 static void EncoderExti(void);
 static int s_start_flag = 0;
+static int s_dir_flag = 0;
 
 /**********************外部调用接口*****************************/
 #define HwDisExti()       HAL_NVIC_DisableIRQ(EXTI9_5_IRQn)
@@ -90,7 +91,11 @@ static int32_t Enc_DiffCnt(uint16_t c1,uint16_t c2)
 	{
 		Angle += ENCODER_TIM_PERIOD;
 	}
-	return Angle;
+	
+	if(s_dir_flag)
+		return -Angle;
+	else
+		return Angle;
 }
 
 
@@ -210,4 +215,9 @@ void Enc_Clr_TotalCnt1(void)
 void Enc_Clr_TotalCnt2(void)
 {
 	Encoder1Data.TotalCnt2 = 0;
+}
+
+void Enc_Set_Dir(int dir)
+{	
+	s_dir_flag = dir;
 }

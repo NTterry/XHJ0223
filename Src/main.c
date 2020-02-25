@@ -48,14 +48,17 @@
 #include "u_log.h"
 #include "Encoder.h"
 #include "Frq_Mens.h"
+#include "SingleAct.h"
+
+
+extern struct SIG_ACT_DATA g_st_SigData;
 /* USER CODE BEGIN Includes */
-uint16_t led_sta;
+uint16_t g_led_sta;
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t g_speed;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -203,25 +206,22 @@ void StartDefaultTask(void const * argument)
 	for(;;)										// 10ms per ticks
 	{
 		i++;
-//		KeyStatus();	
+		
 		KeySta_Poll();
 		if((i % 13) == 1)				/*GUI刷新*/
 			Task_GUI_Function();	
 		
 		if((i % 17) == 1)	
 			Speed_Send();   /*定时向刹车板发送速度信号*/
-		
-//printf("Fq %d\t",Get_FRQE2());		
+			
+//		printf("%d\t",Get_FRQE2());		
 
 		osDelay(10);
         
-		/*显示主机是否开启，参数待定*/
-	  	if(sys_stadata.m_power.Speed > 5)  
-			led_sta |= SIG_CUR;
-		else
-			led_sta &= ~SIG_CUR;
+	  	(g_st_SigData.m_Power > 5)? (LED_BIT_SET(SIG_CUR)): (LED_BIT_CLR(SIG_CUR));
+	
 			
-		Dsp_BarLight(led_sta,0);  	/*LED 指示显示*/
+		Dsp_BarLight(g_led_sta,0);  	/*LED 指示显示*/
 		
 #if (WCH_DOG == 1)
 		if(i % 49 == 1)

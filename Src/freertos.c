@@ -116,7 +116,6 @@ void MX_FREERTOS_Init() {
 /*执行周期 CALUTICK 毫秒*/
 void Timer3_CallBack(void)
 {
-	Etr_SpeedCacu();									/*电能芯片计数*/
 	G_ActPoll_10ms();
 }
 
@@ -134,19 +133,19 @@ void StartTask03(void const * argument)
 	{
 		/*有探头一键启动模式*/
 		status = services();
-
-		if(status != ERR_NONE)	//传递错误
-		{
-			g_errshow = status;
-		}
-		if(sys_fbsta & FB_RUN)
-		{
-			g_errshow &= ~ERR_HALT;
-		}
-		if(sys_fbsta & FB_24VOK)
-		{
-			g_errshow &= ~ERR_PW;
-		}
+		osDelay(50);	//For Test
+//		if(status != ERR_NONE)	//传递错误
+//		{
+//			g_errshow = status;
+//		}
+//		if(sys_fbsta & FB_RUN)
+//		{
+//			g_errshow &= ~ERR_HALT;
+//		}
+//		if(sys_fbsta & FB_24VOK)
+//		{
+//			g_errshow &= ~ERR_PW;
+//		}
 	}
   /* USER CODE END StartTask03 */
 }

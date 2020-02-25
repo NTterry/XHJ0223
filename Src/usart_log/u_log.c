@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stdarg.h"
-#include "stm32f1xx_hal.h"
+#include "stdint.h"
 #include "stdio.h"
 
 #define MAX_LOG_MSG_LEN 255
 
+extern uint32_t HAL_GetTick(void);
 
 static const char *_get_filename(const char *p)
 {

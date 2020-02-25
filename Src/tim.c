@@ -329,16 +329,6 @@ int16_t Etr_GetCount(void)
 }
 
 
-void Etr_SpeedCacu(void)
-{
-	int16_t tmp;
-	
-	tmp = Etr_GetCount();
-
-	sys_Etrcnt.Speed = tmp * (1000/CALUTICK);
-}
-
-
 /*编码器计数 1ms 定时中断里面*/
 void Sys_TickCallBack()
 {  

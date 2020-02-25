@@ -48,6 +48,7 @@ int32_t Enc_Get_Speed(void);
 int32_t Enc_Get_Acce(void);
 int32_t Enc_Get_CNT1(void);
 int32_t Enc_Get_CNT2(void);
+void Enc_Set_Dir(int dir);
 
 /*对于局部函数，不允许在其他文件中直接操作，必须使用函数接口的方式进行操作*/
 #endif

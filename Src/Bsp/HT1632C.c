@@ -341,10 +341,12 @@ Input		: num	:拉力，表示 0 -- 24      10表示 100%的拉力，超过 200%（20）的拉力显
 Return		: None
 Others		: None
 *********************************************************/
-void Dsp_PullLight(uint8_t num)
+void Dsp_PullLight(int16_t num)
 {
 	uint8_t i;
-
+	
+	if(num < 0)
+		num = 0;
 	for(i = 0; i < 24;i++)
 	{
 		if(i < num)
