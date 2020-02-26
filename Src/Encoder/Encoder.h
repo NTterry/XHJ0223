@@ -44,7 +44,7 @@ extern void HwEcTimerTick1ms(void);
 /*接口函数*/
 void Enc_Clr_TotalCnt1(void); 
 void Enc_Clr_TotalCnt2(void); 
-int32_t Enc_Get_Speed(void);
+int32_t Enc_Get_SpeedE1(void);
 int32_t Enc_Get_Acce(void);
 int32_t Enc_Get_CNT1(void);
 int32_t Enc_Get_CNT2(void);

@@ -43,6 +43,7 @@
 #include "GUI.h"
 #include "ModbusRec.h"
 #include "Hangtu.h"
+#include "u_log.h"
 /* USER CODE BEGIN Includes */     
 
 /* USER CODE END Includes */
@@ -133,19 +134,14 @@ void StartTask03(void const * argument)
 	{
 		/*有探头一键启动模式*/
 		status = services();
-		osDelay(50);	//For Test
-//		if(status != ERR_NONE)	//传递错误
-//		{
-//			g_errshow = status;
-//		}
-//		if(sys_fbsta & FB_RUN)
-//		{
-//			g_errshow &= ~ERR_HALT;
-//		}
-//		if(sys_fbsta & FB_24VOK)
-//		{
-//			g_errshow &= ~ERR_PW;
-//		}
+			
+		if(status > ERR_NONE)	//传递错误
+		{
+			Log_e("%x",status);
+			g_errshow = status;
+			
+		}
+		
 	}
   /* USER CODE END StartTask03 */
 }

@@ -211,12 +211,11 @@ extern volatile uint8_t sys_fbsta;						// 外部反馈信号
 //void GetEncode(uint32_t dir, struct EncoderCnt *p);
 /*获得当前功率*/
 void GetPower(struct EtrCnt *p);
-/*正常提锤动作*/
-SYS_STA takeup(void);
-/*一键启动*/
-SYS_STA starttaking(void);
-/*打锤*/
-SYS_STA putdown(int32_t delay);
+
+
+
+
+
 
 /********无探头提锤动作***********/
 SYS_STA ntakeup(void);

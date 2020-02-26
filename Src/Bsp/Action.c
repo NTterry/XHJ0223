@@ -454,7 +454,7 @@ Debug("autolihe %d",sys_stadata.clihe);
 			else
 			{
 				/******************中途溜锤判断**************************/
-				if(Enc_Get_Speed() < 0)
+				if(Enc_Get_SpeedE1() < 0)
 					speedcnt++;
 				else
 				{
@@ -548,7 +548,7 @@ SYS_STA starttaking(void)
 			cnt++;
 			/******************中途溜锤判断**************************/
 			intime = osKernelSysTick();
-			while(Enc_Get_Speed() < 1) 		//中途发现溜锤
+			while(Enc_Get_SpeedE1() < 1) 		//中途发现溜锤
 			{
                 Debug("hsed %d ",sys_stadata.m_high.Speed);
 				if(getmilsec(intime) > 4000)			// 1秒超时
@@ -614,7 +614,7 @@ SYS_STA putdown(int32_t delay)
 	{
 		ctime = osKernelSysTick();
 		/*检测锤是否脱开*/
-		while((sys_stadata.m_power.Speed > epower(LALIMAXPER)) ||(Enc_Get_Speed() > 20))	/*2019.11.15  同时检测速度量*/
+		while((sys_stadata.m_power.Speed > epower(LALIMAXPER)) ||(Enc_Get_SpeedE1() > 20))	/*2019.11.15  同时检测速度量*/
 		{
 			if(getmilsec(ctime) > 1500)				//如果提锤时间超过0.8秒  只执行1次
 			{

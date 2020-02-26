@@ -6,16 +6,19 @@
 #include "u_log.h"
 #include "SingleAct.h"
 
-extern struct SIG_ACT_DATA g_st_SigData;
-
 #define GET_TICK_MS()  osKernelSysTick()
 #define DELAYMS(x)	   osDelay(x)
+
+
+
+extern struct SIG_ACT_DATA g_st_SigData;
+extern uint16_t g_errnum;
 
 SYS_STA Checkdown(void);
 SYS_STA Check_up(void);
 SYS_STA hangtu(uint8_t * pst);
 
-extern uint16_t g_errnum;
+
 
 /*夯土整个工艺流程  */
 /*
@@ -30,7 +33,7 @@ extern uint16_t g_led_sta;
 /*紧急停机处理*/
 void Halt_Stop(void)
 {
-	G_LIHE(ACT_OFF,0);
+	G_LIHE(ACT_OFF,200);
 	G_SHACHE(ACT_ON,0);
 }
 
@@ -247,11 +250,13 @@ void EXT_BUTTON_CHK(void)
 	static uint8_t k_Cluch;
 	static uint8_t k_Brk;
 	static uint16_t b_Zd;
+	static uint8_t b_stop;
 	
 	b_Dd <<= 1;
 	b_Zd <<= 1;
 	k_Cluch <<= 1;
 	k_Brk <<= 1;
+	b_stop <<= 1;
 	
 	if(KEY_DD == GPIO_PIN_SET)
 		b_Dd |= 0x01;
@@ -261,6 +266,17 @@ void EXT_BUTTON_CHK(void)
 		k_Cluch |= 0x01;
 	if(KEY_TSC == GPIO_PIN_RESET)
 		k_Brk |= 0x01;
+	if(KEY_STOP == GPIO_PIN_SET)
+		b_stop |= 0x01;
+		
+	if(b_stop == 0xFF)
+	{
+		g_halt = 0;
+	}
+	else
+	{
+		g_halt = 1;
+	}
 		
 	if(b_Dd == 0xFF)
 	{
@@ -327,94 +343,104 @@ static enum {
 }s_SigActStep;
 
 uint8_t TampStep;
+
+#define SIGACT_READY  s_SigActStep = e_STEP_READY
+
+int SingleAct(int mode)
+{
+	ERR_SIG ret;
+	
+	switch(s_SigActStep)
+	{
+	case e_STEP_READY:
+		LED_BIT_SET(SIG_TICHUI);
+		LED_BIT_CLR(SIG_FANGCHUI);
+		if(mode)
+			s_SigActStep = e_STEP_PULL;
+		else
+			s_SigActStep = e_STEP_STUDY;
+			
+		Sig_ResetSta();
+		break;
+	case e_STEP_STUDY:
+		ret = Sig_StudyUp();
+		if(ret == ERR_SIG_REACHUP)
+		{
+			s_SigActStep = e_STEP_DOWN;
+			Sig_ResetSta();
+			LED_BIT_SET(SIG_FANGCHUI);
+			LED_BIT_CLR(SIG_TICHUI);
+		}
+		break;
+	case e_STEP_PULL:
+		ret = Sig_TakeUp();
+		if(ret == ERR_SIG_REACHUP)
+		{
+			s_SigActStep = e_STEP_DOWN;
+			Sig_ResetSta();
+			LED_BIT_SET(SIG_FANGCHUI);
+			LED_BIT_CLR(SIG_TICHUI);
+		}
+		break;
+	case e_STEP_DOWN:
+		ret = Sig_LandDw();
+		if(ret == ERR_SIG_REACHDW)
+		{
+			s_SigActStep = e_STEP_PULL;
+			Sig_ResetSta();
+			LED_BIT_SET(SIG_TICHUI);
+			LED_BIT_CLR(SIG_FANGCHUI);
+		}
+		break;
+	 default:ret = ERR_SIG_SOFT;break;
+	}
+	return ret;
+}
   
+
 SYS_STA services(void)
 {
 	static	uint8_t s_down;
 	
 	SYS_STA ret;
-	ret = ERR_NONE;
+	ERR_SIG sig_err;
 	
-	if(g_errnum)				// 检测离合和刹车是否正常
-	{
-	  G_LIHE(ACT_OFF,0);
-	  G_SHACHE(ACT_ON,0);
-	  DELAYMS(ERRDLY);
-	  return g_errnum;
-	}
+	ret = ERR_NONE;
 	EXT_BUTTON_CHK();
 	
-	if(!((sys_fbsta & FB_24VOK) && (sys_fbsta & FB_RUN)))	//非正常状态，跳出
+	if(g_errnum > 0)
 	{
-		G_LIHE(ACT_OFF,0);
-		G_SHACHE(ACT_ON,0);
-//		Log_e("FB_24VOK | FB_RUN");
-		DELAYMS(ERRDLY);
-
-		if(!(sys_fbsta & FB_24VOK))
-			return ERR_PW;
-		if(!(sys_fbsta & FB_RUN))
-			return ERR_HALT;
+		osDelay(20);
+		return 0;
 	}
 
 	switch(g_sys_para.s_cmode)
 	{
-		case MOD_SIGACT:     		//自动打锤模式                            
-			switch(s_SigActStep)
-			{
-			case e_STEP_READY:
-				LED_BIT_SET(SIG_TICHUI);
-				LED_BIT_CLR(SIG_FANGCHUI);
-				s_SigActStep = e_STEP_STUDY;
-				Sig_ResetSta();
-				break;
-			case e_STEP_STUDY:
-				ret = Sig_StudyUp();
-				if(ret == ERR_SIG_REACHED)
-				{
-					s_SigActStep = e_STEP_DOWN;
-					Sig_ResetSta();
-					LED_BIT_SET(SIG_FANGCHUI);
-					LED_BIT_CLR(SIG_TICHUI);
-				}
-				break;
-			case e_STEP_PULL:
-				ret = Sig_TakeUp();
-				if(ret == ERR_SIG_REACHED)
-				{
-					s_SigActStep = e_STEP_DOWN;
-					Sig_ResetSta();
-					LED_BIT_SET(SIG_FANGCHUI);
-					LED_BIT_CLR(SIG_TICHUI);
-				}
-				break;
-			case e_STEP_DOWN:
-				ret = Sig_LandDw();
-				if(ret == ERR_SIG_REACHED)
-				{
-					s_SigActStep = e_STEP_PULL;
-					Sig_ResetSta();
-					LED_BIT_SET(SIG_TICHUI);
-					LED_BIT_CLR(SIG_FANGCHUI);
-				}
-				break;
-			 default:ret = ERR_SIG_SOFT;break;
-			}
-			
-			if(ret > ERR_SIG_REACHED)
+		case MOD_SIGACT:     		//自动打锤模式 
+			sig_err = SingleAct(0);
+			if((sig_err > ERR_SIG_REACHDW) || g_halt)
 			{
 				Halt_Stop();
-				g_sys_para.s_cmode = MOD_FREE;
+				g_sys_para.s_cmode = MOD_FREE;		// jump out
+				switch(sig_err)
+				{
+					case ERR_SIG_PULLUP: ret|= ERR_LS;	break;
+					case ERR_SIG_ENCODER:ret|= ERR_TT;break;
+					case ERR_SIG_CUR:ret|= ERR_CT;break;
+					case ERR_SIG_CLING:ret|= ERR_NC;break;
+					case ERR_SIG_BRAKE:ret|= ERR_KC;break;
+					case ERR_SIG_TIMOUT:ret|= ERR_CS;break;
+					default:break;
+				}
 			}
-		  break;	
-		  
+		    break;	  
 	  case MOD_AUTOTAMP:								// 夯土模式
 			ret = hangtu(&TampStep);        			/*轮询无堵塞*/
 			LedSta_Show(TampStep);						/*Led状态显示*/
 		  break;	
 	  case MOD_FREE:
 		  TampStep = 0;s_down = 0;
-		  s_SigActStep = e_STEP_READY;
+		  SIGACT_READY;
 		  
 		  G_SHACHE(ACT_ON,0);
           C_DISCTR();					/* 履带机 取消 如果  Terry 2019.07.04*/
@@ -451,8 +477,7 @@ SYS_STA services(void)
 			g_sys_para.s_cmode = MOD_FREE;
 		  break;
 	}
-	
-		
+
 	if(g_sys_para.s_cmode > MOD_DOWN)
 		g_sys_para.s_cmode = MOD_FREE;
 		
@@ -569,6 +594,8 @@ SYS_STA hangtu(uint8_t * pst)
     SYS_STA ret = 0;
     int tmp,LSpeedCm;    
     
+	LSpeedCm = GetEncoderSpeedCm();
+	
     switch(*pst)
     {
         case S_IDLE:
@@ -580,6 +607,7 @@ SYS_STA hangtu(uint8_t * pst)
                 s_hang.overpow = 0;
                 s_hang.speederr = 0;
 				Prtop.flg = 0;					/*是否需要重新定义离合点的高度*/
+				
 				G_SHACHE(ACT_LIU,0); 
 				*pst = S_DELAY2;                /*先溜放*/
 				s_hang.last_highnum = GetEncoderLen2Cm();		/*溜放时的高度  Terry 2019.11.12 只用于判断下降高度*/
@@ -605,7 +633,6 @@ SYS_STA hangtu(uint8_t * pst)
             break;
 		
         case S_TICHUI:
-				LSpeedCm = GetEncoderSpeedCm();
                 if(Check_up() == 1) 					/*提锤到顶，先拉刹车，后松离合*/  
                 {
 					if(GET_MS_DIFF(s_hang.pvtimer) > 800)	/*间隔至少 0.8秒*/
@@ -729,10 +756,9 @@ SYS_STA hangtu(uint8_t * pst)
                     s_hang.last_downnum = (int16_t)(LPosCm/10);   /*本次下降深度 长度 绝对值 Terry 2019.7.5*/
                     *pst = S_DACHUI;       					/*开始打锤 */
 					
-                    Debug("dao di le \r\n");
+					SIGACT_READY;
                 }
-            }
-            if(tmp > 1)       						/*溜放错误*/
+            }else if(tmp > 1)       						/*溜放错误*/
             {
                 ret |= ERR_DOWN;
                 Debug("溜放错误 \r\n");
@@ -740,33 +766,45 @@ SYS_STA hangtu(uint8_t * pst)
             break;
         case S_DACHUI:
 			usRegHoldingBuf[M_ACT] = 1;				/*提锤标志 Terry 2019.7.6*/
-            ret = takeup();							/*堵塞模式*/
-            Debug("DA chui %d c\r\n",s_hang.dachui_cnt);
+			
+			ret = SingleAct(1);
+			if(ret > ERR_SIG_REACHDW)
+			{
+				Halt_Stop();
+				g_sys_para.s_cmode = MOD_FREE;
+			}
+			else
+			{
+				if(ret == ERR_SIG_REACHDW)
+				{
+					s_hang.dachui_cnt--;
+					if(s_hang.dachui_cnt < 1)
+					{
+						if(s_record.deepth > -50)			/*表示夯土结束  Terry 2019.10.18 */
+						{
+							*pst = S_IDLE;
+							g_sys_para.s_cmode = MOD_FREE;	/*直接退出  2019.8.2*/
+							G_SHACHE(ACT_ON,0);
+							G_LIHE(ACT_OFF,0);
+						}
+						else
+						{
+							*pst = S_PULSE;       /*下一轮提锤操作   直接提锤*/
+							Debug("complete \r\n");
+						}					
+					}
+				}
+			}
+		    	
+            ret = Sig_TakeUp();							/*堵塞模式*/
+			
             if(ret == ERR_NONE)
             {
 				usRegHoldingBuf[M_ACT] = 0;			/*提锤标志 Terry 2019.7.6*/
-                ret |= putdown(0);					/*堵塞模式*/
+                ret = Sig_LandDw();					/*堵塞模式*/
             }
             
-            if(ret == ERR_NONE)
-            {
-                s_hang.dachui_cnt--;
-                if(s_hang.dachui_cnt < 1)
-                {
-					if(s_record.deepth > -50)			/*表示夯土结束  Terry 2019.10.18 */
-					{
-						*pst = S_IDLE;
-						g_sys_para.s_cmode = MOD_FREE;	/*直接退出  2019.8.2*/
-						G_SHACHE(ACT_ON,0);
-						G_LIHE(ACT_OFF,0);
-					}
-					else
-					{
-						*pst = S_PULSE;       /*下一轮提锤操作   直接提锤*/
-						Debug("complete \r\n");
-					}					
-                }
-            }
+
             break;
     }
     /*Switch 结束*/
@@ -775,14 +813,12 @@ SYS_STA hangtu(uint8_t * pst)
         Debug("Stop S\r\n");
 		ret |= ERR_HALT;
     }
-    
-    
     /*异常退出时，立即拉刹车，关闭输送带(莫须有)*/
 	if(ret)
 	{
 		g_sys_para.s_cmode = MOD_FREE; 
 		G_SHACHE(ACT_ON,0);
-		G_LIHE(ACT_OFF,0);					/*2019.8.2添加  Terry*/
+		G_LIHE(ACT_OFF,300);					/*2019.8.2添加  Terry*/
 		C_DISCTR();
 		*pst = S_IDLE; 
 	}
@@ -799,13 +835,13 @@ SYS_STA Checkdown(void)
     static uint32_t last_tim = 0;
     static uint32_t sure_cnt = 0;
 	static uint32_t speed_over = 0;
-	
     SYS_STA ret = 0;
+	
 	int LPosCm;
-	int LSpeedCm = GetEncoderAcceCm();
 	
-	
+	int LSpeedCm = GetEncoderSpeedCm();
     LPosCm = GetEncoderLen2Cm();
+	
     switch(s_hang.liufang_sta)
     {
         case 0:

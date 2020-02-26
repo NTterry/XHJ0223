@@ -191,7 +191,7 @@ inline void EncoderCacuMs(void)
     }
 }
 /**User use**/
-int32_t Enc_Get_Speed(void)
+int32_t Enc_Get_SpeedE1(void)
 {
 	return Encoder1Data.Speed;
 }

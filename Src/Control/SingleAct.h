@@ -6,6 +6,12 @@
 #define _SINGLEACT_H_
 #include "stdint.h"
 
+#define VALID_MIN_CM		10
+#define BRAKE_DLY400		400
+#define VALID_POWH			70
+#define VALID_POWM			50
+#define VALID_POWL			30
+
 enum ACT_SINGLE_UP
 {
 	SIG_IDLE,
@@ -37,13 +43,16 @@ struct SIG_ACT_DATA
 typedef enum ERR_SIGACT
 {
 	ERR_SIG_OK,
-	ERR_SIG_REACHED,	// finish
+	ERR_SIG_REACHUP,	
+	ERR_SIG_REACHDW,  // finish
 	ERR_SIG_PULLUP,
 	ERR_SIG_ENCODER,
 	ERR_SIG_CUR,
 	ERR_SIG_CLING,
 	ERR_SIG_BRAKE,
+	ERR_SIG_TIMOUT,
 	ERR_SIG_SOFT,
+	
 }ERR_SIG;
 
 void Sig_ResetSta(void);

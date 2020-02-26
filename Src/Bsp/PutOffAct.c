@@ -86,9 +86,15 @@ void G_SHACHE(uint32_t sta, uint32_t delay)
 	{
 		if(g_shache.sta == ACT_ON)		/*立即拉刹车  在任务中直接执行*/
 		{
-			C_SNZ();
-            C_AS1_DS();
-            C_AS2_DS();
+//			C_SNZ();
+//            C_AS1_DS();
+//            C_AS2_DS();
+			 C_SNZ();
+		}
+		
+		if(g_shache.sta == ACT_OFF)
+		{
+			C_SZHIDONG();
 		}
 	}
 }
@@ -210,44 +216,40 @@ void g_action(void)
             C_LALIHE();
         }
     }
-    /*刹车延时信号*/
-	if(g_shache.delay == 0)
-    {
-        g_shache.pact = g_shache.sta;
-    } 
-	
-    if(g_shache.delay >= 0)
+//    /*刹车延时信号*/
+//	if(g_shache.delay == 0)
+//    {
+//        g_shache.pact = g_shache.sta;
+////		C_SZHIDONG();// Terry Test
+//    } 
+//    if(g_shache.delay >= 0)
+//    {
+//        g_shache.delay--;
+//    }
+
+    if(g_shache.delay > 0)
     {
         g_shache.delay--;
     }
-
-/*Fb_Err_check()*/
-//	if(g_alihe.delay == 0)
-//	{
-//		if((g_alihe.sta == ACT_OFF) && (Get_Fbsignal(FB_LIHE) == 1))	// 松离合
-//		{
-//			s_lihecnt++;
-//		}
-//		else if((g_alihe.sta == ACT_ON) && (Get_Fbsignal(FB_LIHE) == 0))	// 拉离合
-//		{
-//			s_lihecnt++;
-//		}
-//		else
-//		{
-//			s_lihecnt = 0;
-//		}
-//	}
-//	if(s_lihecnt > 120)			/*Terry 2019.7.9*/
-//	{
-//		g_erract |= ERR_LH;
-//	}
+    else
+    {
+        g_shache.delay = 0;
+        if(g_shache.sta == ACT_OFF)
+        {
+            C_SZHIDONG();				//每10ms确认一次
+        }
+        else
+        {
+            C_SNZ();		// 刹住
+        }
+    }
 }
 
 /*Called by Timer as 10ms*/
 void G_ActPoll_10ms(void)
 {
 	g_action();
-	Shache_Proc();
+//	Shache_Proc();
 }
 
 void Pf_Lihe_Init(void)

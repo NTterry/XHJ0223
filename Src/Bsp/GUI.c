@@ -99,6 +99,8 @@ void GuiDataUpdate(void)
 	if(g_GuiData.g_index == SHOW_BACKSET)
 		s_savecnt = 10;
 }
+
+
 /*
 //	if(!KEY_STOP)
 //    {
@@ -414,8 +416,7 @@ void Task_GUI_Function(void)
 	show_brush();
 	savedatas();
 	/*无错误且急停未按下时，急停OK不断开*/
-//	if(g_errshow || g_stopflg)
-	if(g_errshow)
+	if((g_errshow) || g_halt)
 		C_STOP();
 	else
 		C_OK();
@@ -425,9 +426,9 @@ extern volatile uint8_t sys_fbsta;
 extern void ModbusData_flash(void);
 void savedatas(void)
 {
-	HAL_StatusTypeDef status;
+//	HAL_StatusTypeDef status;
 	
-	status = HAL_OK;
+//	status = HAL_OK;
 	if(s_savecnt > 0)
 		s_savecnt--;
 	if(s_savecnt == 1)
@@ -436,7 +437,7 @@ void savedatas(void)
 			g_sys_para.s_dir = 1;
 		if((sys_fbsta & FB_24VOK))
 		{
-			status = EE_DatasWrite(DATA_ADDRESS,(uint8_t *)&g_sys_para,sizeof(g_sys_para));
+			EE_DatasWrite(DATA_ADDRESS,(uint8_t *)&g_sys_para,sizeof(g_sys_para));
 //			if((status == HAL_OK) && (s_ht1632_test))
 		}
 		s_savecnt = 72000;		// 2H后再自动保存数据
@@ -516,6 +517,7 @@ void GUI_showdata(void)
 	}
 	else
 	{
+		
 		tmp = get_errnum(g_errshow);		//显示故障代号
 		g_errnum = tmp;
 		if(tmp < 10)
@@ -885,7 +887,7 @@ void Key_ModLong(void)
 {
 	IOT_FUNC_ENTRY;
 	
-	if(g_sys_para.s_cmode == MOD_FREE)
+	if((g_sys_para.s_cmode == MOD_FREE) && (g_errshow == ERR_NONE))
 	{
 		if(g_GuiData.g_mode)
 		{
@@ -913,7 +915,12 @@ void Key_StartLong(void)
 
 void Key_Start(void)
 {
-
+	if(g_sys_para.s_cmode != MOD_FREE)
+	{
+		g_sys_para.s_cmode = MOD_FREE;
+		G_SHACHE(ACT_ON,0);
+		G_LIHE(ACT_OFF,200);
+	}
 	IOT_FUNC_ENTRY;
 }
 
