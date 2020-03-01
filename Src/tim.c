@@ -223,7 +223,7 @@ void HAL_TIM_Encoder_MspInit(TIM_HandleTypeDef* htim_encoder)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct); 
 	
 	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+//    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
   /* USER CODE END TIM4_MspInit 1 */
   }
 }
@@ -330,9 +330,11 @@ int16_t Etr_GetCount(void)
 
 
 /*编码器计数 1ms 定时中断里面*/
+extern void Lihe_Poll_Ms(void);
 void Sys_TickCallBack()
 {  
 	HwEcTimerTick1ms();
+	Lihe_Poll_Ms();
 }
 
 /*编码器引脚改外部中断引脚*/

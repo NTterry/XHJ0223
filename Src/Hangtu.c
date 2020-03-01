@@ -345,7 +345,7 @@ static enum {
 uint8_t TampStep;
 
 #define SIGACT_READY  s_SigActStep = e_STEP_READY
-
+extern void SetSaveFlag(void);
 int SingleAct(int mode)
 {
 	ERR_SIG ret;
@@ -370,6 +370,7 @@ int SingleAct(int mode)
 			Sig_ResetSta();
 			LED_BIT_SET(SIG_FANGCHUI);
 			LED_BIT_CLR(SIG_TICHUI);
+			SetSaveFlag();
 		}
 		break;
 	case e_STEP_PULL:
@@ -392,7 +393,7 @@ int SingleAct(int mode)
 			LED_BIT_CLR(SIG_FANGCHUI);
 		}
 		break;
-	 default:ret = ERR_SIG_SOFT;break;
+	 default:ret = ERR_SIG_SOFT;s_SigActStep = e_STEP_READY;break;
 	}
 	return ret;
 }
@@ -440,8 +441,11 @@ SYS_STA services(void)
 		  break;	
 	  case MOD_FREE:
 		  TampStep = 0;s_down = 0;
-		  SIGACT_READY;
-		  
+		  SIGACT_READY; 
+#ifdef USE_LIHE_PWM
+	extern int gLiheRatio;
+	gLiheRatio = 10;
+#endif
 		  G_SHACHE(ACT_ON,0);
           C_DISCTR();					/* 履带机 取消 如果  Terry 2019.07.04*/
 		  LED_BIT_CLR(SIG_TICHUI);
@@ -482,7 +486,7 @@ SYS_STA services(void)
 		g_sys_para.s_cmode = MOD_FREE;
 		
 	if((g_sys_para.s_cmode == MOD_FREE) || (g_sys_para.s_cmode == MOD_TST) ||(g_sys_para.s_cmode == MOD_DOWN))
-		DELAYMS(CALUTICK);													//主动让出给其它任务    2017.10.7
+		DELAYMS(20);													//主动让出给其它任务    2017.10.7
 	else
 		DELAYMS(HANG_TICK);
  
@@ -501,7 +505,7 @@ int Check_Stop(void)
 			stop_cnt = 0;
 			s_hang.stop_sta = 1;
 			now_tim = GET_TICK_MS();
-			power = epower(70);
+			power = Per2Power(70);
 			break;
 		case 1:
 			LSpeedCm = GetEncoderSpeedCm();
@@ -612,7 +616,6 @@ SYS_STA hangtu(uint8_t * pst)
 				*pst = S_DELAY2;                /*先溜放*/
 				s_hang.last_highnum = GetEncoderLen2Cm();		/*溜放时的高度  Terry 2019.11.12 只用于判断下降高度*/
 				s_record.deepth = 0;
-                Debug("Han Start:\r\n");
             }
             break;
         case S_PULSE:
@@ -638,8 +641,7 @@ SYS_STA hangtu(uint8_t * pst)
 					if(GET_MS_DIFF(s_hang.pvtimer) > 800)	/*间隔至少 0.8秒*/
 					{
 						G_LIHE(ACT_OFF,LIHEDLY);
-						G_SHACHE(ACT_ON,0);        		/*先拉刹车*/     
-						Debug("Get Top signal\r\n");        
+						G_SHACHE(ACT_ON,0);        		/*先拉刹车*/      
 						*pst = S_CHECK_UPSTOP;
 						s_hang.pvtimer = GET_TICK_MS();
 						s_hang.stop_sta = 0;
@@ -656,11 +658,10 @@ SYS_STA hangtu(uint8_t * pst)
 				}
                 if(s_hang.speederr > 2800/HANG_TICK)
                 {
-                     Debug("上升溜绳，或者计数错误\r\n");
                      ret = ERR_LIU;
                 }
                 /**************************拉力过载保护*********************/
-                tmp = epower(350);	
+                tmp = Per2Power(350);	
                 if(g_st_SigData.m_Power > tmp)
                     s_hang.overpow++;
                 else
@@ -668,11 +669,10 @@ SYS_STA hangtu(uint8_t * pst)
                 
                 if(s_hang.overpow > 300)   /*持续1.5秒无法拉锤，显示卡锤故障  2019.10.7*/
                 {
-                    Debug("上升卡锤\r\n");
 					ret |= ERR_KC;
                 } 
 				/************************失重保护***************************/
-				tmp = epower(40);
+				tmp = Per2Power(40);
 				if(g_st_SigData.m_Power < tmp)
 					s_hang.lowpow++;
 				else
@@ -682,7 +682,6 @@ SYS_STA hangtu(uint8_t * pst)
 				}
 				if(s_hang.overpow > 2000/HANG_TICK)
 				{
-					Debug("失重保护\r\n");
 					ret |= ERR_LS;
 				}
 				/***********************************************************/
@@ -695,7 +694,6 @@ SYS_STA hangtu(uint8_t * pst)
 				C_ENCTR();
                 s_hang.pvtimer = GET_TICK_MS();
                 *pst = S_XIALIAO;
-                Debug("wait1 1s\r\n");
 			}
 			else if(tmp == 2)
 			{
@@ -714,7 +712,6 @@ SYS_STA hangtu(uint8_t * pst)
                 G_LIHE(ACT_OFF,0);
 				G_SHACHE(ACT_LIU,0); 
                 *pst = S_DELAY2;
-                Debug("wait2 1s\r\n");
 			}
             break;
         case S_DELAY2:                          				/*普通延时  刚开始时不需要延时*/
@@ -725,7 +722,6 @@ SYS_STA hangtu(uint8_t * pst)
 				
                 s_hang.pvtimer = GET_TICK_MS();
                 *pst = S_LIUF;
-                Debug("finish xia liao  %ds\r\n",g_sys_para.s_intval);
 				s_hang.liufang_sta = 0;
             }
             break;
@@ -743,7 +739,6 @@ SYS_STA hangtu(uint8_t * pst)
                 /*记录当前溜放的深度   */
                 if(GetEncoderLen2Cm() > -40)  				/*下降深度过小  下降0.5米*/
                 {
-                    Debug("下降深度过小 \r\n");
                     ret |= ERR_DOWN;  
                 }
                 else
@@ -761,7 +756,6 @@ SYS_STA hangtu(uint8_t * pst)
             }else if(tmp > 1)       						/*溜放错误*/
             {
                 ret |= ERR_DOWN;
-                Debug("溜放错误 \r\n");
             }
             break;
         case S_DACHUI:
@@ -790,7 +784,6 @@ SYS_STA hangtu(uint8_t * pst)
 						else
 						{
 							*pst = S_PULSE;       /*下一轮提锤操作   直接提锤*/
-							Debug("complete \r\n");
 						}					
 					}
 				}
@@ -810,7 +803,6 @@ SYS_STA hangtu(uint8_t * pst)
     /*Switch 结束*/
     if(g_halt)
     {
-        Debug("Stop S\r\n");
 		ret |= ERR_HALT;
     }
     /*异常退出时，立即拉刹车，关闭输送带(莫须有)*/

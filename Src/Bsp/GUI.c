@@ -39,13 +39,18 @@ int16_t get_errnum(uint32_t err);
 void clear_err(uint32_t *perr);
 void CmdProc(void);
 
+
+void SetSaveFlag(void)
+{
+	s_savecnt = 10;
+}
+
 void GuiDataUpdate(void)
 {
 	if(g_sys_para.s_hlihe != g_GuiData.g_lihe)
 	{
 		g_sys_para.s_hlihe = g_GuiData.g_lihe;
 
-		Debug("update lihe %d\r\n",g_sys_para.s_hlihe);
 
 		liheupdate();		//更新离合参数值
 		s_savecnt = 20;
@@ -399,17 +404,8 @@ void Task_GUI_Function(void)
 			showtest(2);
 		else
 		{
-			if(Get_Fbsignal(FB_LIHE))   
-				Debug("拉离合 ");
-			else
-				Debug("松离合 ");
 			
-			if(sys_fbsta & FB_SHACHE)
-				Debug("松刹车\r\n");
-			else
-				Debug("拉刹车\r\n");
 			s_ht1632_test = 0;
-			Debug("Test end  %x\r\n",sys_fbsta);
 		}
 	}
 	
@@ -663,7 +659,6 @@ void Key_HighUpL(void)
 		g_GuiData.g_sethighcm += PER_HIGH * 10;
 		g_GuiData.g_HasChanged = 1;
 		s_highblink = HIGHSHOW * 2;
-		Debug("Hup %d\r\n",g_GuiData.g_sethighcm);
 	}
 	if(g_GuiData.g_sethighcm > MAXSET_HIGH)
 		g_GuiData.g_sethighcm = MAXSET_HIGH;
@@ -732,7 +727,6 @@ void Key_LiheUpL(void)
 		g_GuiData.g_HasChanged = 1;
 		s_liheblink = LIHESHOW * 2;			//闪烁一次
 		s_highblink = 0;
-		Debug("Lup %d\r\n",g_GuiData.g_lihe);
 	}
 }
 
@@ -785,7 +779,7 @@ void Key_Set(void)
 		g_GuiData.g_index++;
 		if(g_GuiData.g_index > SHOW_CNT)
 			g_GuiData.g_index = SHOW_NONE;
-		Debug("index %d\r\n",g_GuiData.g_index);
+		
 	}
 }
 void Key_Add(void)
@@ -803,19 +797,18 @@ void Key_Add(void)
 			{
 				g_GuiData.g_num++;	
 				g_GuiData.g_HasChanged = 1;
-				Debug("unum %d\r\n",g_GuiData.g_num);
+				
 			}
 			break;
 		case SHOW_ZHOU:
 				g_GuiData.g_Zhoucm++;	
 				g_GuiData.g_HasChanged = 1;
-				Debug("uzhou %d\r\n",g_GuiData.g_Zhoucm);break;
+				break;
 		case SHOW_TS:
 			if(g_GuiData.g_ts < 20)
 			{
 				g_GuiData.g_ts++;	
 				g_GuiData.g_HasChanged = 1;
-				Debug("uts %d\r\n",g_GuiData.g_ts);
 			}break;
 		case SHOW_CNT:                             /*Terry add 2019.*/
 			if(g_GuiData.g_hcnt < 10)
@@ -848,7 +841,6 @@ void Key_Sub(void)
 				{
 					g_GuiData.g_num--;
 					g_GuiData.g_HasChanged = 1;
-					Debug("dnum %d\r\n",g_GuiData.g_num);
 				}
 				break;;
 			case SHOW_ZHOU:
@@ -856,7 +848,6 @@ void Key_Sub(void)
 				{
 					g_GuiData.g_Zhoucm--;
 					g_GuiData.g_HasChanged = 1;
-					Debug("dzhou %d\r\n",g_GuiData.g_Zhoucm);
 				}
 					break;
 			case SHOW_TS:
@@ -864,7 +855,6 @@ void Key_Sub(void)
 				{
 					g_GuiData.g_ts--;
 					g_GuiData.g_HasChanged = 1;
-					Debug("dts %d\r\n",g_GuiData.g_ts);
 				}
 				break;
 			case SHOW_CNT:                      /*Terry add*/
@@ -892,13 +882,11 @@ void Key_ModLong(void)
 		if(g_GuiData.g_mode)
 		{
 			g_GuiData.g_mode = 0;
-			Debug("单打");
 			g_GuiData.g_HasChanged = 1;
 		}
 		else
 		{
 			g_GuiData.g_mode = 1;
-			Debug("夯土模式");
 			g_GuiData.g_HasChanged = 1;
 		}
 	}

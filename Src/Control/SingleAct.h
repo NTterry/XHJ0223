@@ -55,6 +55,7 @@ typedef enum ERR_SIGACT
 	
 }ERR_SIG;
 
+int32_t Per2Power(int16_t  percent);
 void Sig_ResetSta(void);
 ERR_SIG Sig_TakeUp(void);
 ERR_SIG Sig_StudyUp(void);

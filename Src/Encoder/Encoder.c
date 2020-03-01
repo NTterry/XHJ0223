@@ -4,9 +4,32 @@
 #include "u_log.h"
 #include "stdio.h"
 
-#define  CNT_DIV     4     //TIM_ENCODERMODE_TI12 模式下实际结果需要4分频
 
-ENCODER  Encoder1Data;
+//测速状态机
+typedef enum {
+    SP_INIT = 0,
+    SP_CALU,
+    SP_REC,
+    SP_DLY = 61,         // 最长测量时间 61ms  只影响速度值和加速度值的更新
+}SPEED_STATE;
+
+/*编码长度，速度和加速度存储*/
+typedef  struct
+{
+    SPEED_STATE Sta;
+    uint16_t    LastResCnt;         //寄存器值
+	int32_t     TotalCnt1;          //总计数值
+    int32_t     TotalCnt2;          //备份计数器值
+    uint32_t    LastTimMs;          //上次记录的时间
+    int32_t     PerTimMs;           //当前记录时间
+    int32_t     PerTick;
+    int32_t     Speed;              // 10倍  n/s
+	int32_t 	PreSpeed;
+    int32_t     Acce;               // n/s^2
+}ENCODER;
+
+
+static ENCODER  Encoder1Data;
 
 static inline void EncoderCacuMs(void);
 static void EncoderExti(void);
@@ -16,32 +39,32 @@ static int s_dir_flag = 0;
 /**********************外部调用接口*****************************/
 #define HwDisExti()       HAL_NVIC_DisableIRQ(EXTI9_5_IRQn)
 #define HwEnExti()        HAL_NVIC_EnableIRQ(EXTI9_5_IRQn)
-#define HwGetCnt()        __HAL_TIM_GET_COUNTER(&htim4)
-#define HwGetCurTickMs()  HAL_GetTick();
+#define HwGetCnt()        __HAL_TIM_GET_COUNTER(&htim4)				 /* Read Encoder cnt by Timer cnt*/
+#define HwGetCurTickMs()  HAL_GetTick();							 /*Get Ticks per 1ms             */
 
+
+/*Encoder Init*/
 void HwEcInit(void)
 {
    //定时器初始化，开启编码模式，开启硬件滤波，编码器启动
    //配置编码器其中一个引脚中断模式
 	MX_TIM4_Init();
 	s_start_flag = 1;
+	HwEnExti();
 }
 
+/*called by Encoder pin Exti Interrupt*/
 void HwEcExitCallBack(void)
 {
 	if(s_start_flag)
 		EncoderExti();
 }
-
+/*Called by 1ms period Timers*/
 void HwEcTimerTick1ms(void)
 {
 	if(s_start_flag)
 		EncoderCacuMs();
 }
-
-
-
-
 
 /**************************************************************/
 
@@ -116,7 +139,7 @@ void EncoderExti(void)
 	uint32_t TmpTim;
 	int32_t  TmpSp;
 	
-  switch (Encoder1Data.Sta)
+	  switch (Encoder1Data.Sta)
       {
           case SP_INIT:
               Encoder1Data.LastTimMs = HwGetCurTickMs();    			    //获得当前系统时间
@@ -134,8 +157,11 @@ void EncoderExti(void)
               Encoder1Data.TotalCnt2 += Encoder1Data.PerTick;
               Encoder1Data.TotalCnt1 += Encoder1Data.PerTick;
               TmpSp = Encoder1Data.PerTick * (10000 /CNT_DIV) / Encoder1Data.PerTimMs;        //multiply by 10
+			  Encoder1Data.Speed = (TmpSp + Encoder1Data.PreSpeed) >> 1;
+			  
               /*与上一次的速度比较，计算加速度的值*/
-              Encoder1Data.Acce = 100 * (TmpSp - Encoder1Data.Speed)/Encoder1Data.PerTimMs;   // ticks / (s * s)
+              Encoder1Data.Acce = 100 * (Encoder1Data.Speed - Encoder1Data.PreSpeed)/Encoder1Data.PerTimMs;   // ticks / (s * s)
+			  Encoder1Data.PreSpeed = Encoder1Data.Speed;
               Encoder1Data.Speed = TmpSp;
               /*保存当前值*/
               Encoder1Data.LastTimMs = TmpTim;
@@ -160,20 +186,20 @@ void EncoderExti(void)
   ***********************************************************/
 inline void EncoderCacuMs(void)
 {
-    uint32_t tmp;
+    uint32_t cur_tim;
 
 	if(Encoder1Data.Sta == SP_REC)						
 	{
-		HwEnExti();					/*¿ªÆô±àÂëÆ÷Òý½ÅÍâ²¿ÖÐ¶Ï*/
-		Encoder1Data.Sta = SP_CALU;								/*¿ªÊ¼¼ì²â*/
+		HwEnExti();					
+		Encoder1Data.Sta = SP_CALU;		
 	}
     if(Encoder1Data.Sta > SP_REC)
 	{
         Encoder1Data.Sta--;
 	}
     
-    tmp = HwGetCurTickMs();
-    if(Enc_DiffTimes(Encoder1Data.LastTimMs,tmp) >= SPTIMEOUT )    		// 如果超时，将触发错误信号
+    cur_tim = HwGetCurTickMs();
+    if(Enc_DiffTimes(Encoder1Data.LastTimMs,cur_tim) >= SPTIMEOUT )    		// 如果超时，将触发错误信号
     {
         uint16_t counter;
 		counter = HwGetCnt();
@@ -181,13 +207,14 @@ inline void EncoderCacuMs(void)
         Encoder1Data.TotalCnt2 += Encoder1Data.PerTick;
         Encoder1Data.TotalCnt1 += Encoder1Data.PerTick;
         Encoder1Data.LastResCnt = counter;
-        Encoder1Data.LastTimMs = tmp;
-        //计算速度
+        Encoder1Data.LastTimMs = cur_tim;
+        //Calculate the Speed
         Encoder1Data.Speed = Encoder1Data.PerTick * (10000 /CNT_DIV)  / SPTIMEOUT;  // multiply by 10
+		Encoder1Data.Speed = (Encoder1Data.Speed + Encoder1Data.PreSpeed) >> 1;
+		Encoder1Data.PreSpeed = Encoder1Data.Speed;
         Encoder1Data.Acce = 0;
         Encoder1Data.Sta = SP_DLY;
 		HwEnExti();
-//		Log_e("cnt");
     }
 }
 /**User use**/
@@ -201,16 +228,27 @@ int32_t Enc_Get_Acce(void)
 }
 int32_t Enc_Get_CNT1(void)
 {
-	return Encoder1Data.TotalCnt1 / CNT_DIV;
+	int CNT1;
+	uint16_t counter;
+	
+	counter = HwGetCnt();
+	CNT1 = Encoder1Data.TotalCnt1 + Enc_DiffCnt(Encoder1Data.LastResCnt,counter);
+	
+	return CNT1 / CNT_DIV;
 }
 int32_t Enc_Get_CNT2(void)
 {
-	return Encoder1Data.TotalCnt2 / CNT_DIV;
+	int CNT2;
+	uint16_t counter;
+	
+	counter = HwGetCnt();
+	CNT2 = Encoder1Data.TotalCnt2 + Enc_DiffCnt(Encoder1Data.LastResCnt,counter);
+	return CNT2 / CNT_DIV;
 }
 
 void Enc_Clr_TotalCnt1(void)
 {
-	Encoder1Data.TotalCnt1 = 0;
+	Encoder1Data.TotalCnt1 = 0;    // not clear the register
 }
 void Enc_Clr_TotalCnt2(void)
 {

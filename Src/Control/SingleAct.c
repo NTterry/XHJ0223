@@ -121,28 +121,34 @@ ERR_SIG Sig_TakeUp(void)
 	g_st_SigData.m_HeightShowCm = GetEncoderLen1Cm();
 	g_st_SigData.m_Power = Get_FRQE2();
 	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
-//	LPrint("%d,",g_st_SigData.m_Power / 100);
+	
+//	LPrint("%d,",g_st_SigData.m_SpeedCm);
 	switch(Sta_SigTakeUp)
 	{
 		case SIG_IDLE:
 			StuckCnt = 0;
 			ClrNullCnt = 0;
+#ifdef USE_LIHE_PWM
+	extern int gLiheRatio;
+	gLiheRatio = 10;
+#endif
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
-		
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0); G_SHACHE(ACT_OFF,BRAKE_DLY400);
 			Sta_SigTakeUp = SIG_PULL_HOLD;
-			
 			SET_TIME; LPrint("Pull \r\n");
 			break;
 		
 		case SIG_PULL_HOLD:
 			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)
 			{
+#ifdef USE_LIHE_PWM
+	gLiheRatio = LIHE_PWM;
+#endif
 				Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 				Log_e("Pos %d sp %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
-				SET_TIME;
+				StartTim = SET_TIME;
 			}
 			if(CHECK_TIMEOUT(5000) || (g_st_SigData.m_HeightShowCm < -300))
 			{
@@ -161,21 +167,22 @@ ERR_SIG Sig_TakeUp(void)
 				if(ClrNullCnt++ > 5)
 				{
 					Sta_SigTakeUp = SIG_WORKUP;
-					Log_e("Clr %d",g_st_SigData.m_HeightShowCm);
-//					Enc_Clr_TotalCnt1();
+					Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
+					Enc_Clr_TotalCnt1();
 					StartTim = SET_TIME;
 				}
 			}
 			if(g_st_SigData.m_Power < Per2Power(VALID_POWM))
 			{
 				ClrNullCnt = 0;
-				if(CHECK_TIMEOUT(200))
+				if(CHECK_TIMEOUT(10))
 				{
-//					Enc_Clr_TotalCnt1();
-					LPrint("Clr");
+//					Log_e("Clr %d",g_st_SigData.m_HeightShowCm);
+					Enc_Clr_TotalCnt1();
+					SET_TIME;
 				}
 			}
-			if(CHECK_TIMEOUT(5000) || (g_st_SigData.m_HeightShowCm < -300))	   // need add pull
+			if(((LAST_TIME - StartTim) > 5000) || (g_st_SigData.m_HeightShowCm < -300))	   // need add pull
 			{
 				if(g_st_SigData.m_Power < Per2Power(VALID_POWM))
 					err_sta = ERR_SIG_CUR;
@@ -215,6 +222,9 @@ ERR_SIG Sig_TakeUp(void)
 		
 		case SIG_REACH_TOP:
 			err_sta = ERR_SIG_REACHUP;
+#ifdef USE_LIHE_PWM
+	gLiheRatio = 10;
+#endif
 			break;
 		
 		case SIG_BLOCKED:
@@ -450,11 +460,15 @@ int GetEncoderSpeedCm(void)
 {
 	float ftmp;
 	int ret;
+	static int prespeed = 0;
 	
 	ftmp = Enc_Get_SpeedE1();
 	ftmp = ftmp * g_sys_para.s_zhou / g_sys_para.s_numchi;
 	ftmp = ftmp / 10;
 	ret = (int)ftmp;
+	
+	ret = (ret + prespeed)>> 1;
+	prespeed = ret;
 	return ret;
 }
 

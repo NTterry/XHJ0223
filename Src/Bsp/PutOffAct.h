@@ -6,7 +6,7 @@
 #include "stm32f1xx_hal.h"
 
 
-#define T_ACT_MS			10
+#define T_ACT_MS			5
 
 /*¶¯×÷×´Ì¬*/
 #define ACT_DEF	3

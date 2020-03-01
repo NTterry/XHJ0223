@@ -13,7 +13,7 @@ Date		:2015.06.01  - 2017.02.11
 #include "config.h"
 #include "tim.h"
 
-#define CALUTICK				10					//40毫秒一次
+#define CALUTICK				5					//40毫秒一次
 #define SHACHEDLY				(800)
 #define LIHEDLY         		(4 * 110)    /*0.4秒*/
 #define ERRDLY					500
@@ -243,6 +243,5 @@ int GetEncoderAcceCm(void);
 int GetEncoderLen1Cm(void);
 int GetEncoderLen2Cm(void);
 
-int32_t epower(int16_t  ratio);
 #endif
 
