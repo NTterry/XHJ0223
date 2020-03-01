@@ -180,12 +180,12 @@ void EncoderExti(void)
               Encoder1Data.TotalCnt1 += Encoder1Data.PerTick;
               TmpSp = Encoder1Data.PerTick * (10000 /CNT_DIV) / Encoder1Data.PerTimMs;        //multiply by 10
 			  
-			  /*Soft filter*/
-			  Encoder1Data.Speed = (TmpSp + Encoder1Data.PreSpeed) >> 1;
+	      /*Soft filter*/
+	      Encoder1Data.Speed = (TmpSp + Encoder1Data.PreSpeed) >> 1;
 			  
               /*与上一次的速度比较，计算加速度的值*/
               Encoder1Data.Acce = 100 * (Encoder1Data.Speed - Encoder1Data.PreSpeed)/Encoder1Data.PerTimMs;   // ticks / (s * s)
-			  Encoder1Data.PreSpeed = Encoder1Data.Speed;
+	      Encoder1Data.PreSpeed = Encoder1Data.Speed;
               Encoder1Data.Speed = TmpSp;
               /*保存当前值*/
               Encoder1Data.LastTimMs = TmpTim;
@@ -211,12 +211,12 @@ void EncoderExti(void)
 inline void EncoderCacuMs(void)
 {
     uint32_t cur_tim;
-
-	if(Encoder1Data.Sta == SP_REC)						
-	{
-		HwEnExti();					
-		Encoder1Data.Sta = SP_CALU;		
-	}
+	
+    if(Encoder1Data.Sta == SP_REC)						
+    {
+        HwEnExti();					
+        Encoder1Data.Sta = SP_CALU;		
+    }
     if(Encoder1Data.Sta > SP_REC)
     {
         Encoder1Data.Sta--;
@@ -226,7 +226,8 @@ inline void EncoderCacuMs(void)
     if(Enc_DiffTimes(Encoder1Data.LastTimMs,cur_tim) >= SPTIMEOUT )    		// 如果超时，将触发错误信号
     {
         uint16_t counter;
-	    counter = HwGetCnt();
+	    
+	counter = HwGetCnt();
         Encoder1Data.PerTick = Enc_DiffCnt(Encoder1Data.LastResCnt,counter);
         Encoder1Data.TotalCnt2 += Encoder1Data.PerTick;
         Encoder1Data.TotalCnt1 += Encoder1Data.PerTick;
@@ -234,11 +235,11 @@ inline void EncoderCacuMs(void)
         Encoder1Data.LastTimMs = cur_tim;
         //Calculate the Speed
         Encoder1Data.Speed = Encoder1Data.PerTick * (10000 /CNT_DIV)  / SPTIMEOUT;  // multiply by 10
-	    Encoder1Data.Speed = (Encoder1Data.Speed + Encoder1Data.PreSpeed) >> 1;
-	    Encoder1Data.PreSpeed = Encoder1Data.Speed;
+	Encoder1Data.Speed = (Encoder1Data.Speed + Encoder1Data.PreSpeed) >> 1;
+	Encoder1Data.PreSpeed = Encoder1Data.Speed;
         Encoder1Data.Acce = 0;
         Encoder1Data.Sta = SP_DLY;
-	    HwEnExti();
+	HwEnExti();
     }
 }
 /**User use  multiply 10**/
