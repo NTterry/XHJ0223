@@ -1,39 +1,40 @@
-/*
- * Terry is pleased to support the open source community by making IC Capture Fqz available.
- * Copyright (C) 2020 Terry Limited, a Tencent company. All rights reserved.
-   ²¶»ñÄ£Ê½²âÁ¿ÆµÂÊ
-   1. ¿ªÆô¶¨Ê±Æ÷²¶»ñÄ£Ê½£¨Channel£©
-   2. ¿ªÆôIC_Capture IRQ and Timer OverLoad IRQ
-   3. ÖĞ¶ÏÖĞ£¬Ìí¼ÓÒÔÉÏÁ½¸öÖĞ¶ÏµÄ»Øµ÷º¯Êı
-   4. µ÷ÓÃICOverLoadIRQ() µÃµ½µ±Ç°ÆµÂÊ  multipy 100
- * Unless required by applicable law or agreed to in writing, software distributed under the License is
- * distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+/**********************************************************************************
+  Copyright (C),2018-2020, JSJJ Tech.Co., Ltd
+  FileName: Frq_Mens.h
+  Author:   Terryc     Version:V1.0    Data:2020.3.1
+  Description: ä½¿ç”¨æ•è·æ¨¡å¼æµ‹é‡é¢‘ç‡
+  Others:    å‡†å¤‡å·¥ä½œ
+             1. å¼€å¯å®šæ—¶å™¨æ•è·æ¨¡å¼ï¼ˆChannelï¼‰
+             2. å¼€å¯IC_Capture IRQ and Timer OverLoad IRQ
+             3. ä¸­æ–­ä¸­ï¼Œæ·»åŠ ä»¥ä¸Šä¸¤ä¸ªä¸­æ–­çš„å›è°ƒå‡½æ•°
+             4. è°ƒç”¨ICOverLoadIRQ() å¾—åˆ°å½“å‰é¢‘ç‡  multipy 100
+  Function List:
+      void IC_Mens_Init(void);
+      void ICaptureIRQ(uint32_t ic_val); 
+      void ICOverLoadIRQ(void);
+      int Get_FRQE2(void);
+  History: 
+      Terryc  V1.0   2020.3.1    build this module
+***********************************************************************************/
 
 
 #ifndef _FRQ_MENS_H_
 #define _FRQ_MENS_H_
 #include "stm32f1xx_hal.h"
 
-#define TIM_PREIOD	50000
-#define TIM_TICK	10		//10us
-
-#define MAX_TIMUS			40000			// max 0.3s
+#define TIM_PREIOD	      50000      // è‡ªåŠ¨è£…è½½å€¼
+#define TIM_TICK	      10		 //10us  è®¾å®šå®šæ—¶å™¨æ—¶é—´é—´éš”10us
+#define MAX_TIMUS		  40000		 // (us) max 0.4s
 
 
 void IC_Mens_Init(void);
 void ICaptureIRQ(uint32_t ic_val);  	// In Capture IRQHandler
-void ICOverLoadIRQ(void);				// In Timer over load IRQHandler
+void ICOverLoadIRQ(void);				   // In Timer over load IRQHandler
 int Get_FRQE2(void);
 
 #endif
 
-
-
-//¶¨Ê±Æ÷µÄ²¶»ñÄ£Ê½ÅäÖÃÈçÏÂ£¬Àı×Ó
+//å®šæ—¶å™¨çš„æ•è·æ¨¡å¼é…ç½®å¦‚ä¸‹ï¼Œä¾‹å­
 //void MX_TIM2_Init(void)
 //{
 // 
