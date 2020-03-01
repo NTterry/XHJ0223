@@ -35,6 +35,9 @@ SYS_STA services(void);
 #define M_HIGH2		21	  
 #define M_CNT2		22
 
+#define LED_BIT_SET(x)		g_led_sta |= x
+#define LED_BIT_CLR(x)		g_led_sta &= ~x
+
 
 extern void ModbusData_Init(void);
 extern void ModbusData_Chk(void);

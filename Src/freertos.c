@@ -43,6 +43,7 @@
 #include "GUI.h"
 #include "ModbusRec.h"
 #include "Hangtu.h"
+#include "u_log.h"
 /* USER CODE BEGIN Includes */     
 
 /* USER CODE END Includes */
@@ -102,7 +103,7 @@ void MX_FREERTOS_Init() {
 
   /* Create the thread(s) */
   /* 按键检测 喂狗 其他任务 */
-  osThreadDef(NomalTask, StartDefaultTask, osPriorityNormal, 0, 768);
+  osThreadDef(NomalTask, StartDefaultTask, osPriorityNormal, 0, 1024);
   NomalTaskHandle = osThreadCreate(osThread(NomalTask), NULL);
   
   /* 主工作任务*/
@@ -116,7 +117,6 @@ void MX_FREERTOS_Init() {
 /*执行周期 CALUTICK 毫秒*/
 void Timer3_CallBack(void)
 {
-	Etr_SpeedCacu();									/*电能芯片计数*/
 	G_ActPoll_10ms();
 }
 
@@ -129,23 +129,19 @@ void StartTask03(void const * argument)
 	SYS_STA status;
 	
 	osDelay(1000);
+	
 	for(;;)
 	{
 		/*有探头一键启动模式*/
 		status = services();
-
-		if(status != ERR_NONE)	//传递错误
+			
+		if(status > ERR_NONE)	//传递错误
 		{
+			Log_e("%x",status);
 			g_errshow = status;
+			
 		}
-		if(sys_fbsta & FB_RUN)
-		{
-			g_errshow &= ~ERR_HALT;
-		}
-		if(sys_fbsta & FB_24VOK)
-		{
-			g_errshow &= ~ERR_PW;
-		}
+		
 	}
   /* USER CODE END StartTask03 */
 }

@@ -33,6 +33,11 @@
 #define C_SNZ()			HAL_GPIO_WritePin(PORT_CTR, PIN_FSC,GPIO_PIN_SET)	//取消制动
 
 
+#ifdef USE_LIHE_PWM
+	int gLiheRatio = 0;		//比值 1 - 10
+	int LiheRLY	 = 0;
+#endif
+
 /*离合动作和刹车动作共用的标准数据*/
 struct ACT_STA
 {
@@ -86,9 +91,18 @@ void G_SHACHE(uint32_t sta, uint32_t delay)
 	{
 		if(g_shache.sta == ACT_ON)		/*立即拉刹车  在任务中直接执行*/
 		{
+#ifdef USE_LIUF
 			C_SNZ();
             C_AS1_DS();
             C_AS2_DS();
+#else
+			 C_SNZ();
+#endif
+		}
+		
+		if(g_shache.sta == ACT_OFF)
+		{
+			C_SZHIDONG();
 		}
 	}
 }
@@ -102,15 +116,43 @@ void G_LIHE(uint32_t sta, uint32_t delay)
 	g_alihe.sta = sta;
 	if((delay == 0) && (sta == ACT_ON))
 	{
+#ifndef USE_LIHE_PWM
 		C_LALIHE();
+#else
+		LiheRLY = sta;
+#endif
 	}
 	if((delay == 0) && (sta == ACT_OFF))
 	{
+#ifndef USE_LIHE_PWM
 		C_SONGLIHE();
-	}
-		
+#else
+		LiheRLY = sta;
+#endif
+	}	
 //	portEXIT_CRITICAL();
 }
+
+
+void Lihe_Poll_Ms(void)
+{
+#ifdef USE_LIHE_PWM
+	static int scnt;
+	if(LiheRLY == ACT_ON)
+	{
+		if(scnt <  gLiheRatio)
+			C_LALIHE();
+		else
+			C_SONGLIHE();
+			
+		scnt++;
+		scnt = scnt % 10;
+	}
+	else
+		C_SONGLIHE();
+#endif
+}
+
 
 uint16_t Shache_Proc(void)
 {
@@ -191,7 +233,6 @@ uint16_t Shache_Proc(void)
   * 返回值: 无
   * 说明: 调用任务 StartDefaultTask  每 CALUTICK 毫秒执行一次
   */
-//static uint16_t s_lihecnt = 0;
 void g_action(void)
 {	 
     if(g_alihe.delay > 0)
@@ -201,53 +242,59 @@ void g_action(void)
     else
     {
         g_alihe.delay = 0;
+
         if(g_alihe.sta == ACT_OFF)
         {
-            C_SONGLIHE();				//每10ms确认一次
+           				//每10ms确认一次
+#ifndef USE_LIHE_PWM
+		 C_SONGLIHE();
+#else
+		LiheRLY = ACT_OFF;
+#endif
         }
         else
         {
-            C_LALIHE();
+#ifndef USE_LIHE_PWM
+		C_LALIHE();
+#else
+		LiheRLY = ACT_ON;
+#endif
         }
     }
-    /*刹车延时信号*/
-	if(g_shache.delay == 0)
-    {
-        g_shache.pact = g_shache.sta;
-    } 
-	
-    if(g_shache.delay >= 0)
+//    /*刹车延时信号*/
+//	if(g_shache.delay == 0)
+//    {
+//        g_shache.pact = g_shache.sta;
+////		C_SZHIDONG();// Terry Test
+//    } 
+//    if(g_shache.delay >= 0)
+//    {
+//        g_shache.delay--;
+//    }
+
+    if(g_shache.delay > 0)
     {
         g_shache.delay--;
     }
-
-/*Fb_Err_check()*/
-//	if(g_alihe.delay == 0)
-//	{
-//		if((g_alihe.sta == ACT_OFF) && (Get_Fbsignal(FB_LIHE) == 1))	// 松离合
-//		{
-//			s_lihecnt++;
-//		}
-//		else if((g_alihe.sta == ACT_ON) && (Get_Fbsignal(FB_LIHE) == 0))	// 拉离合
-//		{
-//			s_lihecnt++;
-//		}
-//		else
-//		{
-//			s_lihecnt = 0;
-//		}
-//	}
-//	if(s_lihecnt > 120)			/*Terry 2019.7.9*/
-//	{
-//		g_erract |= ERR_LH;
-//	}
+    else
+    {
+        g_shache.delay = 0;
+        if(g_shache.sta == ACT_OFF)
+        {
+            C_SZHIDONG();				//每10ms确认一次
+        }
+        else
+        {
+            C_SNZ();		// 刹住
+        }
+    }
 }
 
 /*Called by Timer as 10ms*/
 void G_ActPoll_10ms(void)
 {
 	g_action();
-	Shache_Proc();
+//	Shache_Proc();
 }
 
 void Pf_Lihe_Init(void)

@@ -56,7 +56,8 @@ void IOT_Log_Gen(const char *file, const char *func, const int line, const char 
 		}
 
 	#define Log_e(fmt, ...) IOT_Log_Gen(__FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
-
+	
+	#define LPrint(format,...) printf (format,##__VA_ARGS__)
 #else
 	#define IOT_FUNC_ENTRY
 	#define IOT_FUNC_EXIT 			\
@@ -68,6 +69,7 @@ void IOT_Log_Gen(const char *file, const char *func, const int line, const char 
 			return x; \
 		}
 	#define Log_e(fmt, ...)
+	#define LPrint(format,...)
 #endif
 
 

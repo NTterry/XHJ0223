@@ -103,7 +103,7 @@ void Task_GUI_Function(void);
 void show_brush(void);
 extern void GUI_Init(void);
 
-void Dsp_PullLight(uint8_t num);   // 拉力灯柱显示
+void Dsp_PullLight(int16_t num);   // 拉力灯柱显示
 void Dsp_HighLight(int8_t num, int8_t set,int8_t pot,int8_t potblink,int8_t highblink); //高度灯柱显示
 void Dsp_BarLight(int16_t num,uint8_t flg);	/*显示松弛度条*/
 void Dsp_Num(int16_t num, uint8_t dot,uint8_t str);		//显示数值（数码管）

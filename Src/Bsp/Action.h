@@ -13,7 +13,7 @@ Date		:2015.06.01  - 2017.02.11
 #include "config.h"
 #include "tim.h"
 
-#define CALUTICK				10					//40毫秒一次
+#define CALUTICK				5					//40毫秒一次
 #define SHACHEDLY				(800)
 #define LIHEDLY         		(4 * 110)    /*0.4秒*/
 #define ERRDLY					500
@@ -58,8 +58,8 @@ Date		:2015.06.01  - 2017.02.11
 enum emWORKMODE
 {
     MOD_FREE = 0,
-    MOD_TT2,
-    MOD_ZTT2,       /*自动夯土流程*/
+    MOD_SIGACT,
+    MOD_AUTOTAMP,       /*自动夯土流程*/
     MOD_MAN,
     MOD_MANOFF,
     MOD_TST,
@@ -140,10 +140,8 @@ __packed struct SYSATTR
 	int32_t s_hprot;					/*高度保护设置 默认 300cm*/
 	int16_t s_pset;						/*永久授权模式*/
 	uint8_t s_intval;					/*双打间隔时间，单位 0.1秒   改成 送料时间 Terry 2019.5.21  单位 秒  2-15秒*/
-	int8_t  s_zidong;					/*自动打标志  0 空闲  1 探头模式自动打 2 无探头模式自动打 3 测试模式*/
+	int8_t  s_cmode;					/*自动打标志  0 空闲  1 探头模式自动打 2 无探头模式自动打 3 测试模式*/
 	int8_t  s_mode;						/*0 单打  1 表示双打*/
-	
-	
 };
 
 /*有探头与无探头共用的离合调整数据*/
@@ -197,8 +195,7 @@ typedef __packed struct SPEED
 #define HALT_BREAK	{			\
 						if(g_halt)	\
 						{status |= ERR_HALT; break;}  \
-						status |= Get_Action_Sta(); \
-                        if(sys_attr.s_zidong == MOD_FREE)\
+                        if(g_sys_para.s_cmode == MOD_FREE)\
                             break;\
 					}
 
@@ -206,7 +203,7 @@ typedef __packed struct SPEED
 
 typedef  uint32_t SYS_STA;
 
-extern struct SYSATTR sys_attr;
+extern struct SYSATTR g_sys_para;
 extern struct STADATA sys_stadata;
 extern volatile uint8_t sys_fbsta;						// 外部反馈信号
 
@@ -214,12 +211,11 @@ extern volatile uint8_t sys_fbsta;						// 外部反馈信号
 //void GetEncode(uint32_t dir, struct EncoderCnt *p);
 /*获得当前功率*/
 void GetPower(struct EtrCnt *p);
-/*正常提锤动作*/
-SYS_STA takeup(void);
-/*一键启动*/
-SYS_STA starttaking(void);
-/*打锤*/
-SYS_STA putdown(int32_t delay);
+
+
+
+
+
 
 /********无探头提锤动作***********/
 SYS_STA ntakeup(void);
@@ -247,6 +243,5 @@ int GetEncoderAcceCm(void);
 int GetEncoderLen1Cm(void);
 int GetEncoderLen2Cm(void);
 
-int32_t epower(int16_t  ratio);
 #endif
 

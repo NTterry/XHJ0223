@@ -40,7 +40,6 @@ static void I2C_EEPROM_Error (void)
   
   /*重新初始化*/
   MX_I2C2_Init();
-  Debug("EEPROM I2C通信超时，重新启动\r\n");
 }
 
 /**
@@ -86,8 +85,6 @@ HAL_StatusTypeDef I2C_EEPROM_WriteBuffer(uint16_t Addr, uint8_t Reg, uint16_t Re
   {
     /* 调用I2C通信错误处理函数 */
     I2C_EEPROM_Error();
-//	  debug("Err %d",status);
-	  Debug("Err ");
   }        
   return status;
 }
@@ -137,7 +134,6 @@ HAL_StatusTypeDef I2C_EEPROM_ReadBuffer(uint16_t Addr, uint8_t Reg, uint16_t Reg
   if(status != HAL_OK)
   {
     I2C_EEPROM_Error();
-	   Debug("Err %d",status);
   }        
   return status;
 }

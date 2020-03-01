@@ -16,17 +16,22 @@ Date		:2017.07.7  - 2017.9.11
 #include "stdio.h"
 
 
-#define 	DZJ_DBUG 	0
 #define  	WCH_DOG		0			/*1 使能窗看门狗*/
 
-//#define 	USE_MOBUS_SLAVE			
 
-#if DZJ_DBUG
-	#define Debug(format,...) printf (format,##__VA_ARGS__)
-#else
-	#define Debug(format,...) 
+#define USE_LIHE_PWM
+
+#ifdef USE_LIHE_PWM
+	#define LIHE_PWM		7
 #endif
 
+
+//#define USE_LIUF
+
+
+
+
+//#define 	USE_MOBUS_SLAVE		  // Enable Modbus GUI
 
 /*数码管显示驱动脚*/
 #define PIN_HCS		GPIO_PIN_3	

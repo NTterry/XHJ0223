@@ -38,6 +38,8 @@
 #include "Encoder.h"
 #include "gpio.h"
 #include "Action.h"
+#include "u_log.h"
+#include "Frq_Mens.h"
 
 /* USER CODE BEGIN 0 */
 struct EtrCnt sys_Etrcnt;
@@ -55,26 +57,69 @@ TIM_HandleTypeDef htim4;	/*编码器模式*/
 /* TIM2 init function 外部脉冲计数器，电能信号的检测*/
 void MX_TIM2_Init(void)
 {
-  TIM_ClockConfigTypeDef sClockSourceConfig;
-  TIM_MasterConfigTypeDef sMasterConfig;
+ 
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
 
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 719;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = MAXCOUNT-1;
+  htim2.Init.Period = TIM_PREIOD - 1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  HAL_TIM_Base_Init(&htim2);
 
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_ETRMODE2;
-  sClockSourceConfig.ClockPolarity = TIM_CLOCKPOLARITY_NONINVERTED;
-  sClockSourceConfig.ClockPrescaler = TIM_CLOCKPRESCALER_DIV1;
-  sClockSourceConfig.ClockFilter = 0x06;									/*配置滤波器*/
-  HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig);
-
+  if (HAL_TIM_IC_Init(&htim2) != HAL_OK)
+  {
+    //Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig);
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    //Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 8;
+  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    //Error_Handler();
+  }
+  __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
+  
+  HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
 }
+
+void HAL_TIM_IC_MspInit(TIM_HandleTypeDef* tim_icHandle)
+{
+
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  if(tim_icHandle->Instance==TIM2)
+  {
+  /* USER CODE BEGIN TIM2_MspInit 0 */
+
+  /* USER CODE END TIM2_MspInit 0 */
+    /* TIM2 clock enable */
+    __HAL_RCC_TIM2_CLK_ENABLE();
+  
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    /**TIM2 GPIO Configuration    
+    PA0-WKUP     ------> TIM2_CH1 
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* TIM2 interrupt Init */
+    HAL_NVIC_SetPriority(TIM2_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+  /* USER CODE BEGIN TIM2_MspInit 1 */
+	
+  /* USER CODE END TIM2_MspInit 1 */
+  }
+}
+
 
 /* TIM3 init function  25ms定时器，计算电能  更新编码计数*/
 void MX_TIM3_Init(void)
@@ -130,30 +175,7 @@ void MX_TIM4_Init(void)
 
 void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
 {
-
-  GPIO_InitTypeDef GPIO_InitStruct;
-    
-  if(htim_base->Instance==TIM2)
-  {
-  /* USER CODE BEGIN TIM2_MspInit 0 */
-
-  /* USER CODE END TIM2_MspInit 0 */
-    /* Peripheral clock enable */
-    __TIM2_CLK_ENABLE();
-  
-    /**TIM2 GPIO Configuration    
-    PA0-WKUP     ------> TIM2_ETR 
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_0;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* USER CODE BEGIN TIM2_MspInit 1 */
-
-  /* USER CODE END TIM2_MspInit 1 */
-  }
-  else if(htim_base->Instance==TIM3)
+  if(htim_base->Instance==TIM3)
   {
   /* USER CODE BEGIN TIM3_MspInit 0 */
 
@@ -165,7 +187,8 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     HAL_NVIC_SetPriority(TIM3_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(TIM3_IRQn);
   /* USER CODE BEGIN TIM3_MspInit 1 */
-
+	
+	
   /* USER CODE END TIM3_MspInit 1 */
   }
 }
@@ -200,7 +223,7 @@ void HAL_TIM_Encoder_MspInit(TIM_HandleTypeDef* htim_encoder)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct); 
 	
 	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+//    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
   /* USER CODE END TIM4_MspInit 1 */
   }
 }
@@ -272,11 +295,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(htim->Instance == TIM3)
 	{
 		Timer3_CallBack();
-
-//		Enc_SpeedCacu();
-//		GetEncode(sys_attr.s_dir,&sys_stadata.m_high);		/*自动打专用的计数器*/
-//		UserEncode(sys_attr.s_dir,&user_encoder);			/*(struct EncoderCnt *)*/
-//		myspeed.readyflg = 0;
+	}
+	if(htim->Instance == TIM2)
+	{
+//		Log_e("tim2");
+		ICOverLoadIRQ();
 	}
 }
 
@@ -306,20 +329,12 @@ int16_t Etr_GetCount(void)
 }
 
 
-void Etr_SpeedCacu(void)
-{
-	int16_t tmp;
-	
-	tmp = Etr_GetCount();
-
-	sys_Etrcnt.Speed = tmp * (1000/CALUTICK);
-}
-
-
 /*编码器计数 1ms 定时中断里面*/
+extern void Lihe_Poll_Ms(void);
 void Sys_TickCallBack()
 {  
 	HwEcTimerTick1ms();
+	Lihe_Poll_Ms();
 }
 
 /*编码器引脚改外部中断引脚*/
@@ -336,6 +351,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	if(GPIO_Pin == GPIO_PIN_7)										/*T2中断*/
 	{
 		sp_protect++;		
+	}
+}
+
+
+
+
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim->Instance == TIM2)
+	{
+		ICaptureIRQ(htim->Instance->CCR1);
 	}
 }
 
