@@ -128,7 +128,7 @@ void StartTask03(void const * argument)
 {
 	SYS_STA status;
 	
-	osDelay(1000);
+	osDelay(10);
 	
 	for(;;)
 	{

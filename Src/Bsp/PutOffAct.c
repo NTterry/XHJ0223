@@ -1,27 +1,12 @@
 
 #include "PutOffAct.h"
 #include "config.h"
+#include "u_log.h"
+#include "gpio.h"
 
+//松离合
 
-// 执行器
-#define PIN_FLH			GPIO_PIN_11							//离合控制脚
-#define PIN_FSC			GPIO_PIN_12							//刹车控制脚
-						//急停控制脚
-#define PIN_AS1         GPIO_PIN_6                          //刹车辅助信号引脚      2018.12.24
-#define PIN_AS2         GPIO_PIN_7                          //刹车辅助信号引脚      2018.12.24
-
-#define PORT_CTR		GPIOA
-
-#define PORT_CAS        GPIOC
-
-#define C_LALIHE()		HAL_GPIO_WritePin(PORT_CTR, PIN_FLH,GPIO_PIN_RESET)										//拉离合
-#define C_SONGLIHE()	HAL_GPIO_WritePin(PORT_CTR, PIN_FLH,GPIO_PIN_SET)										//松离合
-
-/*刹车辅助信号*/
-#define C_AS1_EN()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS1,GPIO_PIN_RESET)	
-#define C_AS1_DS()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS1,GPIO_PIN_SET)	
-#define C_AS2_EN()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS2,GPIO_PIN_RESET)	
-#define C_AS2_DS()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS2,GPIO_PIN_SET)	
+	
 
 /*软件模拟使用*/
 //#define C_SONGSHACHE()	HAL_GPIO_WritePin(PORT_CTR, PIN_FSC,GPIO_PIN_SET)
@@ -99,11 +84,13 @@ void G_SHACHE(uint32_t sta, uint32_t delay)
 			 C_SNZ();
 #endif
 		}
-		
+#ifndef USE_LIUF	
 		if(g_shache.sta == ACT_OFF)
 		{
 			C_SZHIDONG();
 		}
+#endif
+
 	}
 }
 
@@ -261,17 +248,19 @@ void g_action(void)
 #endif
         }
     }
-//    /*刹车延时信号*/
-//	if(g_shache.delay == 0)
-//    {
-//        g_shache.pact = g_shache.sta;
-////		C_SZHIDONG();// Terry Test
-//    } 
-//    if(g_shache.delay >= 0)
-//    {
-//        g_shache.delay--;
-//    }
-
+#ifdef USE_LIUF
+    /*刹车延时信号*/
+	if(g_shache.delay == 0)
+    {
+        g_shache.pact = g_shache.sta;
+//		Log_e("Shache Zero");
+	
+    } 
+    if(g_shache.delay >= 0)
+    {
+        g_shache.delay--;
+    }
+#else
     if(g_shache.delay > 0)
     {
         g_shache.delay--;
@@ -288,13 +277,16 @@ void g_action(void)
             C_SNZ();		// 刹住
         }
     }
+#endif
 }
 
 /*Called by Timer as 10ms*/
 void G_ActPoll_10ms(void)
 {
 	g_action();
-//	Shache_Proc();
+#ifdef USE_LIUF
+	Shache_Proc();
+#endif
 }
 
 void Pf_Lihe_Init(void)

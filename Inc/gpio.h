@@ -42,6 +42,26 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
+// 执行器
+#define PIN_FLH			GPIO_PIN_11							//离合控制脚
+#define PIN_FSC			GPIO_PIN_12							//刹车控制脚
+						//急停控制脚
+#define PIN_AS1         GPIO_PIN_6                          //刹车辅助信号引脚      2018.12.24
+#define PIN_AS2         GPIO_PIN_7                          //刹车辅助信号引脚      2018.12.24
+
+#define PORT_CTR		GPIOA
+
+#define PORT_CAS        GPIOC
+
+#define C_LALIHE()		HAL_GPIO_WritePin(PORT_CTR, PIN_FLH,GPIO_PIN_RESET)										//拉离合
+#define C_SONGLIHE()	HAL_GPIO_WritePin(PORT_CTR, PIN_FLH,GPIO_PIN_SET)										
+/*刹车辅助信号*/
+#define C_AS1_EN()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS1,GPIO_PIN_RESET)	
+#define C_AS1_DS()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS1,GPIO_PIN_SET)	
+#define C_AS2_EN()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS2,GPIO_PIN_RESET)	
+#define C_AS2_DS()       HAL_GPIO_WritePin(PORT_CAS, PIN_AS2,GPIO_PIN_SET)
+
+
 void MX_GPIO_Init(void);
 #ifdef __cplusplus
 }

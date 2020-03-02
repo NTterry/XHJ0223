@@ -146,6 +146,8 @@ void MX_GPIO_Init(void)
 	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
     C_DISCTR();
 	BUZZER(0);
+	C_AS1_DS();
+    C_AS2_DS();
     
 }
 

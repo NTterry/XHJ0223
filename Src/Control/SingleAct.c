@@ -22,7 +22,7 @@ static int Sta_Stuck = 0;
 
 struct SIG_ACT_DATA g_st_SigData;
 
-
+extern int gLiheRatio;
 extern struct SYSATTR g_sys_para;
 int GetEncoderSpeedCm(void);
 int GetEncoderLen1Cm(void);
@@ -129,13 +129,14 @@ ERR_SIG Sig_TakeUp(void)
 			StuckCnt = 0;
 			ClrNullCnt = 0;
 #ifdef USE_LIHE_PWM
-	extern int gLiheRatio;
+
 	gLiheRatio = 10;
 #endif
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0); G_SHACHE(ACT_OFF,BRAKE_DLY400);
+			gLiheRatio = 10;		//先给小力
 			Sta_SigTakeUp = SIG_PULL_HOLD;
 			SET_TIME; LPrint("Pull \r\n");
 			break;
@@ -143,9 +144,6 @@ ERR_SIG Sig_TakeUp(void)
 		case SIG_PULL_HOLD:
 			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)
 			{
-#ifdef USE_LIHE_PWM
-	gLiheRatio = LIHE_PWM;
-#endif
 				Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 				Log_e("Pos %d sp %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 				StartTim = SET_TIME;
@@ -164,8 +162,13 @@ ERR_SIG Sig_TakeUp(void)
 		case SIG_WAIT_VALID_UP:
 			if((g_st_SigData.m_SpeedCm > VALID_MIN_CM) && (g_st_SigData.m_Power > Per2Power(VALID_POWH)))
 			{
+				
 				if(ClrNullCnt++ > 5)
 				{
+					#ifdef USE_LIHE_PWM
+						gLiheRatio = LIHE_PWM;
+						Log_e("大力");
+				    #endif
 					Sta_SigTakeUp = SIG_WORKUP;
 					Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 					Enc_Clr_TotalCnt1();
@@ -175,9 +178,8 @@ ERR_SIG Sig_TakeUp(void)
 			if(g_st_SigData.m_Power < Per2Power(VALID_POWM))
 			{
 				ClrNullCnt = 0;
-				if(CHECK_TIMEOUT(10))
+				if(CHECK_TIMEOUT(20))
 				{
-//					Log_e("Clr %d",g_st_SigData.m_HeightShowCm);
 					Enc_Clr_TotalCnt1();
 					SET_TIME;
 				}
@@ -190,6 +192,8 @@ ERR_SIG Sig_TakeUp(void)
 					err_sta = ERR_SIG_ENCODER;
 				else
 					err_sta = ERR_SIG_PULLUP;
+					
+				Log_e("Takeup Err %d",err_sta);
 			}
 			break;
 			
@@ -200,6 +204,16 @@ ERR_SIG Sig_TakeUp(void)
 			}
 			else
 			{
+				#ifdef USE_LIHE_PWM
+				if(g_st_SigData.m_HeightShowCm > 100)
+				{
+					if(gLiheRatio < 10)
+					{
+						gLiheRatio = 10;			//小力
+						Log_e("小力");
+						}
+				}
+				#endif
 				err_sta = BreakOff_Check(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm);
 				if(err_sta > ERR_SIG_REACHUP)
 					Log_e("%d",err_sta);
@@ -273,6 +287,7 @@ ERR_SIG Sig_StudyUp(void)
 			g_sys_para.s_pnull = g_st_SigData.m_Power;
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			Enc_Clr_TotalCnt1();
+			gLiheRatio = LIHE_PWM;
 			dir_cnt = 0;dir_sure = 0;
 			break;
 		
@@ -387,7 +402,7 @@ ERR_SIG Sig_LandDw(void)
 			G_LIHE(ACT_OFF,0);
 			G_SHACHE(ACT_OFF, 300);
 			Sta_SigLandDw = DIG_CHKDW; 
-			LPrint("Dw\r\n");
+			LPrint("Dw  %d\r\n",g_st_SigData.m_HeightShowCm);
 			break;
 			
 		case DIG_CHKDW:
@@ -399,14 +414,17 @@ ERR_SIG Sig_LandDw(void)
 			if(g_st_SigData.m_HeightShowCm > (g_sys_para.s_sethighcm + 120))	// over 
 			{
 				err_dw = ERR_SIG_CLING;
-			}else if(CHECK_TIMEOUT(1200))
+			}else if(CHECK_TIMEOUT(2000))
 			{
 				Sta_SigLandDw = DIG_BLOCKED;
 				G_SHACHE(ACT_ON, 0);
 				SET_TIME;
 				s_ClingCnt++;
 				if(s_ClingCnt > 3)
+				{
 					err_dw = ERR_SIG_CLING;
+					Log_e("ERR_SIG_CLING");
+				}
 			}
 			break;
 		case DIG_BLOCKED:
@@ -417,21 +435,28 @@ ERR_SIG Sig_LandDw(void)
 					Sta_SigLandDw = DIG_CHKDW;
 					G_SHACHE(ACT_OFF, 0);
 					SET_TIME;
+					Log_e("BLOCK OK");
 				}
 			}
 			else
 			{
+				G_SHACHE(ACT_OFF, 0);
 				Sta_SigLandDw = DIG_CHKDW;
+				Log_e("BLOCK back");
 			}
 			
-			if(CHECK_TIMEOUT(3000) || (g_st_SigData.m_HeightShowCm < (g_sys_para.s_sethighcm + 150)))
+			if(CHECK_TIMEOUT(4000) || (g_st_SigData.m_HeightShowCm > (g_sys_para.s_sethighcm + 150)))
 			{
 				if(g_st_SigData.m_Power > Per2Power(140))
 				{
 					err_dw = ERR_SIG_CLING;
+					Log_e("ERR_SIG_CLING");
 				}
 				else
+				{
 					err_dw = ERR_SIG_BRAKE;
+					Log_e("ERR_SIG_BRAKE");
+				}
 			}
 			break;
 			
@@ -439,9 +464,13 @@ ERR_SIG Sig_LandDw(void)
 			if(g_st_SigData.m_HeightShowCm < g_sys_para.s_hlihe)
 			{
 				err_dw = ERR_SIG_REACHDW;
+				Log_e("ERR_SIG_REACHDW");
 			}
 			if(CHECK_TIMEOUT(5000))
+			{
 				err_dw = ERR_SIG_TIMOUT;
+				Log_e("ERR_SIG_TIMOUT");
+			}
 				
 			break;
 		

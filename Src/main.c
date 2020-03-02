@@ -122,9 +122,8 @@ int main(void)
   
   MX_TIM2_Init();                   //电能芯片计数
   MX_TIM3_Init();                   //定时器测量电能计数
-//  MX_TIM4_Init();                 //编码器 计数
-//  MX_USART1_UART_Init();
-  MX_USART3_UART_Init();
+  MX_USART3_UART_Init();			//刹车板通信
+  
   MX_I2C2_Init();
   HwEcInit();
   /* Call init function for freertos objects (in freertos.c) */
@@ -246,8 +245,8 @@ void Speed_Send(void)
 	
 	tmp = GetEncoderSpeedCm();			/*发送速度的绝对值  2019.12.08*/
 	
-//	if(tmp < 0)
-//		tmp = -tmp;						/*不应该小于0   取反 2019.8.2*/
+	if(tmp < 0)
+		tmp = -tmp;						/*不应该小于0   取反 2019.8.2*/
 	
 	if(tmp > 10000)						/*限制*/
 		tmp = 10000;

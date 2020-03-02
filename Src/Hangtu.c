@@ -243,7 +243,8 @@ void LedSta_Show(uint8_t ledsta)
 
 /*控制的主任务*/
 
-
+int liu_flg = 0;
+int sha_flg = 0;
 void EXT_BUTTON_CHK(void)
 {
 	static uint8_t b_Dd;
@@ -251,12 +252,14 @@ void EXT_BUTTON_CHK(void)
 	static uint8_t k_Brk;
 	static uint16_t b_Zd;
 	static uint8_t b_stop;
+	static uint8_t b_liu;
 	
 	b_Dd <<= 1;
 	b_Zd <<= 1;
 	k_Cluch <<= 1;
 	k_Brk <<= 1;
 	b_stop <<= 1;
+	b_liu <<= 1;
 	
 	if(KEY_DD == GPIO_PIN_SET)
 		b_Dd |= 0x01;
@@ -268,6 +271,8 @@ void EXT_BUTTON_CHK(void)
 		k_Brk |= 0x01;
 	if(KEY_STOP == GPIO_PIN_SET)
 		b_stop |= 0x01;
+	if(KEY_LIU == GPIO_PIN_SET)
+		b_liu |= 0x01;
 		
 	if(b_stop == 0xFF)
 	{
@@ -306,9 +311,8 @@ void EXT_BUTTON_CHK(void)
 		}
 	}
 	
-	if((k_Cluch == 0xFF) || (k_Brk == 0xFF))
+	if((k_Cluch == 0xFF) || (k_Brk == 0xFF)||(b_liu == 0xff))
 	{
-		IOT_FUNC_ENTRY;
 		if(g_sys_para.s_cmode == MOD_FREE)
 		{
 			g_sys_para.s_cmode = MOD_TST;
@@ -320,9 +324,44 @@ void EXT_BUTTON_CHK(void)
 			G_LIHE(ACT_OFF,0);
 			
 		if(k_Brk == 0xFF)
-			G_SHACHE(ACT_OFF,0);
+		{
+			if(sha_flg <= 0)
+			{
+				G_SHACHE(ACT_OFF,0);
+				sha_flg = 1;
+				Log_e("ACT_OFF");
+			}
+		}
 		else
-			G_SHACHE(ACT_ON,0);
+		{
+			if(sha_flg)
+			{
+				sha_flg = 0;
+				G_SHACHE(ACT_ON,0);
+				Log_e("ACT_ON");
+			}
+		}
+		
+		if(b_liu == 0xff)
+		{
+			if(liu_flg <= 0)
+			{
+				G_SHACHE(ACT_LIU,0);
+				liu_flg = 1;
+				Log_e("ACT_LIU");
+			}
+		}
+		else
+		{
+			if(liu_flg > 0)
+			{
+				liu_flg = 0;
+				G_SHACHE(ACT_ON,0);
+				Log_e("ACT_ON");
+			}
+		}
+		
+		
 	}
 	else
 	{
@@ -330,6 +369,7 @@ void EXT_BUTTON_CHK(void)
 		{
 			g_sys_para.s_cmode = MOD_FREE;
 			G_LIHE(ACT_OFF,0);G_SHACHE(ACT_ON,0);
+			sha_flg = 0;liu_flg = 0;
 		}
 	}
 }
@@ -422,6 +462,7 @@ SYS_STA services(void)
 			if((sig_err > ERR_SIG_REACHDW) || g_halt)
 			{
 				Halt_Stop();
+				Log_e("Halt stop");
 				g_sys_para.s_cmode = MOD_FREE;		// jump out
 				switch(sig_err)
 				{
@@ -453,6 +494,13 @@ SYS_STA services(void)
 	  case MOD_MAN:						//手动模式
 		  if(TampStep == 0)
 		  {
+extern int Get_FRQE2(void);
+
+			  if(Get_FRQE2() > Per2Power(50))
+					gLiheRatio = LIHE_PWM;
+			  else
+				    gLiheRatio = 10;		//先给小力，检测到拉力后给大力
+					
 		      LED_BIT_SET(SIG_TICHUI);
 			  G_LIHE(ACT_ON,0);
 			  G_SHACHE(ACT_OFF,SHACHEDLY);
