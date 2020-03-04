@@ -386,9 +386,26 @@ uint8_t TampStep;
 
 #define SIGACT_READY  s_SigActStep = e_STEP_READY
 extern void SetSaveFlag(void);
+
+
+/************************************************************
+  * @brief   整个单打过程，非堵塞
+  * @param   mode : 0 第一下提锤为学习模式
+                    1 直接启动
+  * @return  错误状态
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    包含提锤和打锤的过程，
+             提锤到顶返回 ERR_SIG_REACHUP
+			 打锤结束返回 ERR_SIG_REACHDW
+			 正常工作返回 ERR_SIG_OK
+			 其余为错误模式
+			 函数非重入
+  ***********************************************************/
 int SingleAct(int mode)
 {
-	ERR_SIG ret;
+	ERR_SIG ret = ERR_SIG_OK;
 	
 	switch(s_SigActStep)
 	{
@@ -398,7 +415,7 @@ int SingleAct(int mode)
 		if(mode)
 			s_SigActStep = e_STEP_PULL;
 		else
-			s_SigActStep = e_STEP_STUDY;
+			s_SigActStep = e_STEP_STUDY;	
 			
 		Sig_ResetSta();
 		break;
@@ -433,11 +450,15 @@ int SingleAct(int mode)
 			LED_BIT_CLR(SIG_FANGCHUI);
 		}
 		break;
-	 default:ret = ERR_SIG_SOFT;s_SigActStep = e_STEP_READY;break;
+	 default:ret = ERR_SIG_SOFT;s_SigActStep = e_STEP_READY;
+	    Log_e("ERR_SIG_SOFT");
+	    break;
 	}
+	
 	return ret;
 }
   
+
 
 SYS_STA services(void)
 {
@@ -485,7 +506,7 @@ SYS_STA services(void)
 		  SIGACT_READY; 
 #ifdef USE_LIHE_PWM
 	extern int gLiheRatio;
-	gLiheRatio = 10;
+	gLiheRatio = LIHE_TINY;
 #endif
 		  G_SHACHE(ACT_ON,0);
           C_DISCTR();					/* 履带机 取消 如果  Terry 2019.07.04*/
@@ -494,13 +515,11 @@ SYS_STA services(void)
 	  case MOD_MAN:						//手动模式
 		  if(TampStep == 0)
 		  {
-extern int Get_FRQE2(void);
-
-			  if(Get_FRQE2() > Per2Power(50))
-					gLiheRatio = LIHE_PWM;
-			  else
-				    gLiheRatio = 10;		//先给小力，检测到拉力后给大力
-					
+#ifdef USE_LIHE_PWM
+			  extern int Get_FRQE2(void);
+			  if(Get_FRQE2() > Per2Power(40))
+					gLiheRatio = LIHE_BIG;
+#endif					
 		      LED_BIT_SET(SIG_TICHUI);
 			  G_LIHE(ACT_ON,0);
 			  G_SHACHE(ACT_OFF,SHACHEDLY);

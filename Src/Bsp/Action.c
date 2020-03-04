@@ -6,9 +6,10 @@
 #include "Encoder.h"
 #include "PutOffAct.h"
 #include "u_log.h"
-struct STADATA sys_stadata;						// 系统参数
 
-struct SYSATTR g_sys_para;
+
+struct STADATA sys_stadata;						
+struct SYSATTR g_sys_para;							// 系统参数
 
 struct LIHEDATA	    TTlehe;							//使用探头的离合计数模式,修改离合点后，保存所需参数
 struct LIHEDATA	    TMlehe;		    				// TM离合动作，保存所需参数

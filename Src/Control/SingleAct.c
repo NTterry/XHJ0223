@@ -8,6 +8,7 @@
 #include "cmsis_os.h"
 #include "u_log.h"
 
+
 #define GET_SYS_TIMEMS()	osKernelSysTick()
 #define DEF_TIMEOUT		static uint32_t s_pre_time
 #define SET_TIME		s_pre_time = GET_SYS_TIMEMS()
@@ -15,53 +16,62 @@
 #define CHECK_TIMEOUT(x) (((GET_SYS_TIMEMS() - s_pre_time) > x) ? 1 : 0)
 
 
-static enum ACT_SINGLE_UP Sta_SigTakeUp;
-static enum ACT_SINGLE_DW Sta_SigLandDw;
+static enum ACT_SINGLE_UP Sta_SigTakeUp;     //提锤检测状态
+static enum ACT_SINGLE_DW Sta_SigLandDw;     //下锤检测状态
+static int Sta_Stuck = 0;					 //堵转检测状态
 
-static int Sta_Stuck = 0;
+struct SIG_ACT_DATA g_st_SigData;			 //打锤时的实时高度，速度信息
 
-struct SIG_ACT_DATA g_st_SigData;
-
-extern int gLiheRatio;
+extern int gLiheRatio;						 //离合信号比例 0 - 10
 extern struct SYSATTR g_sys_para;
+
 int GetEncoderSpeedCm(void);
 int GetEncoderLen1Cm(void);
 int GetEncoderLen2Cm(void);
 int32_t Per2Power(int16_t  percent);
 
-//Prevent pull interruption
-ERR_SIG BreakOff_Check(int power,int speedcm)
+/*
+	work up check  if proper taking up
+	return if it back to normal
+	
+*/
+static ERR_SIG BreakOff_Check(int power,int speedcm)
 {
 	DEF_TIMEOUT;
 	ERR_SIG ret = ERR_SIG_OK;
 	
-	if((speedcm > VALID_MIN_CM) && (power > Per2Power(VALID_POWM)))
+	if((speedcm > VALID_MIN_CM) && (power > Per2Power(VALID_POWM)) && (power < Per2Power(VALID_POWOVER)))
 	{
 		SET_TIME;
 		ret = ERR_SIG_OK;
 	}
-	else if((speedcm < VALID_MIN_CM) && (power > Per2Power(VALID_POWM)))
-	{
-		if(CHECK_TIMEOUT(1000))  
-			ret = ERR_SIG_ENCODER;
-	}
-	else
+	else if((speedcm < VALID_MIN_CM) && (power > Per2Power(VALID_POWOVER)))
 	{
 		if(CHECK_TIMEOUT(1000))  
 			ret = ERR_SIG_PULLUP;
 	}
+	else if((speedcm < VALID_MIN_CM) && (power > Per2Power(VALID_POWM)))
+	{
+		if(CHECK_TIMEOUT(3000))  
+			ret = ERR_SIG_ENCODER;
+	}else
+	{
+		if(CHECK_TIMEOUT(3000))  
+			ret = ERR_SIG_SOFT;
+	}
 	
 	return ret;
 }
+
 /*堵转检测*/
-int Stuck_Ckeck(int power,int speedcm)
+static int Stuck_Ckeck(int power,int speedcm)
 {
 	DEF_TIMEOUT;
 	int ret = 0;
 	switch(Sta_Stuck)
 	{
 		case 0:
-			if(power > Per2Power(180) && ((speedcm) > VALID_MIN_CM))
+			if(power > Per2Power(160) && ((speedcm) > VALID_MIN_CM))
 			{
 				Sta_Stuck = 1;
 				SET_TIME;
@@ -102,7 +112,15 @@ int Stuck_Ckeck(int power,int speedcm)
 }
 
 
-
+/************************************************************
+  * @brief   初始化为Reset 状态
+  * @param   none
+  * @return  状态
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    none
+  ***********************************************************/
 void Sig_ResetSta(void)
 {
 	Sta_SigTakeUp = SIG_IDLE;
@@ -110,6 +128,15 @@ void Sig_ResetSta(void)
 }
 
 
+/************************************************************
+  * @brief   正常模式的提锤
+  * @param   none
+  * @return  状态
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    故障判断，超时时间由提锤高度确定
+  ***********************************************************/
 ERR_SIG Sig_TakeUp(void)
 {
 	DEF_TIMEOUT;
@@ -122,21 +149,19 @@ ERR_SIG Sig_TakeUp(void)
 	g_st_SigData.m_Power = Get_FRQE2();
 	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
 	
-//	LPrint("%d,",g_st_SigData.m_SpeedCm);
 	switch(Sta_SigTakeUp)
 	{
 		case SIG_IDLE:
 			StuckCnt = 0;
 			ClrNullCnt = 0;
-#ifdef USE_LIHE_PWM
-
-	gLiheRatio = 10;
-#endif
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0); G_SHACHE(ACT_OFF,BRAKE_DLY400);
-			gLiheRatio = 10;		//先给小力
+			
+#ifdef USE_LIHE_PWM
+			gLiheRatio = LIHE_TINY;							/*先给小力  */
+#endif
 			Sta_SigTakeUp = SIG_PULL_HOLD;
 			SET_TIME; LPrint("Pull \r\n");
 			break;
@@ -165,10 +190,10 @@ ERR_SIG Sig_TakeUp(void)
 				
 				if(ClrNullCnt++ > 5)
 				{
-					#ifdef USE_LIHE_PWM
-						gLiheRatio = LIHE_PWM;
+#ifdef USE_LIHE_PWM
+						gLiheRatio = LIHE_BIG;
 						Log_e("大力");
-				    #endif
+#endif
 					Sta_SigTakeUp = SIG_WORKUP;
 					Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 					Enc_Clr_TotalCnt1();
@@ -204,16 +229,13 @@ ERR_SIG Sig_TakeUp(void)
 			}
 			else
 			{
-				#ifdef USE_LIHE_PWM
+#ifdef USE_LIHE_PWM
 				if(g_st_SigData.m_HeightShowCm > 100)
 				{
-					if(gLiheRatio < 10)
-					{
-						gLiheRatio = 10;			//小力
-						Log_e("小力");
-						}
+					gLiheRatio = LIHE_TINY;			//小力
+					Log_e("小力");
 				}
-				#endif
+#endif
 				err_sta = BreakOff_Check(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm);
 				if(err_sta > ERR_SIG_REACHUP)
 					Log_e("%d",err_sta);
@@ -237,7 +259,7 @@ ERR_SIG Sig_TakeUp(void)
 		case SIG_REACH_TOP:
 			err_sta = ERR_SIG_REACHUP;
 #ifdef USE_LIHE_PWM
-	gLiheRatio = 10;
+			gLiheRatio = LIHE_TINY;
 #endif
 			break;
 		
@@ -270,7 +292,16 @@ ERR_SIG Sig_TakeUp(void)
 		return err_sta;
 }
 
-
+/************************************************************
+  * @brief   学习模式的提锤
+  * @param   none
+  * @return  状态
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    先进行编码器清零
+			 提锤超时时间由提锤高度确定
+  ***********************************************************/
 ERR_SIG Sig_StudyUp(void)
 {
 	DEF_TIMEOUT;
@@ -284,23 +315,26 @@ ERR_SIG Sig_StudyUp(void)
 	switch(Sta_SigTakeUp)
 	{
 		case SIG_IDLE:
-			g_sys_para.s_pnull = g_st_SigData.m_Power;
-			Sta_SigTakeUp = SIG_PULL_CLUTCH;
+			g_sys_para.s_pnull = g_st_SigData.m_Power;   //当前的功率为空载功率
 			Enc_Clr_TotalCnt1();
-			gLiheRatio = LIHE_PWM;
+			
+#ifdef USE_LIHE_PWM
+			gLiheRatio = LIHE_BIG;
+#endif
 			dir_cnt = 0;dir_sure = 0;
+			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
 		
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0);
 			G_SHACHE(ACT_OFF,400);
-			Sta_SigTakeUp = SIG_PULL_HOLD;
 			Log_e("Pos %d sp %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 			SET_TIME;
+			Sta_SigTakeUp = SIG_PULL_HOLD;
 		break;
 		
 		case SIG_PULL_HOLD:
-			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)
+			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)    //检测到速度有效
 			{
 				dir_sure++;
 				if(dir_sure > 40)
@@ -309,7 +343,7 @@ ERR_SIG Sig_StudyUp(void)
 				}
 				if(dir_sure == 3)
 				{
-					Log_e("Pos %d",g_st_SigData.m_HeightShowCm);
+					Log_e("upPos %d",g_st_SigData.m_HeightShowCm);
 				}
 					
 				SET_TIME;
@@ -340,7 +374,7 @@ ERR_SIG Sig_StudyUp(void)
 			{
 				if(g_st_SigData.m_HeightShowCm > g_sys_para.s_sethighcm / 2)
 				{
-					g_sys_para.s_pfull = g_st_SigData.m_Power;
+					g_sys_para.s_pfull = g_st_SigData.m_Power; // 超过设定一半时，保存有效拉力值
 					Sta_SigTakeUp = SIG_WORKUP;
 				}
 				SET_TIME;
@@ -366,6 +400,11 @@ ERR_SIG Sig_StudyUp(void)
 				err_sta = ERR_SIG_CUR;
 				Log_e("f%d  n%d",g_sys_para.s_pfull,g_sys_para.s_pnull);
 			}
+			if(CHECK_TIMEOUT(5000))
+			{
+				err_sta = ERR_SIG_TIMOUT;
+				Log_e("Time out");
+			}
 		break;
 		
 		case SIG_REACH_TOP:
@@ -382,7 +421,20 @@ ERR_SIG Sig_StudyUp(void)
 		return err_sta;
 }
 
-
+/************************************************************
+  * @brief   d打锤动作，先松离合，再松刹车(if exist)
+  * @param   none
+  * @return  状态
+            ERR_SIG_CLING:黏离合
+			ERR_SIG_BRAKE:刹车故障
+			ERR_SIG_REACHDW:正常到底
+			ERR_SIG_TIMOUT：下降超时
+			
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    状态机判断，不堵塞执行
+  ***********************************************************/
 ERR_SIG Sig_LandDw(void)
 {	
 	DEF_TIMEOUT;
@@ -393,7 +445,7 @@ ERR_SIG Sig_LandDw(void)
 	g_st_SigData.m_HeightShowCm = GetEncoderLen1Cm();
 	g_st_SigData.m_Power = Get_FRQE2();
 	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
-//	LPrint("%d,",g_st_SigData.m_Power / 100);
+	
 	switch(Sta_SigLandDw)
 	{
 		case DIG_IDLE:
@@ -402,7 +454,7 @@ ERR_SIG Sig_LandDw(void)
 			G_LIHE(ACT_OFF,0);
 			G_SHACHE(ACT_OFF, 300);
 			Sta_SigLandDw = DIG_CHKDW; 
-			LPrint("Dw  %d\r\n",g_st_SigData.m_HeightShowCm);
+			LPrint("Dw Top  %d\r\n",g_st_SigData.m_HeightShowCm);
 			break;
 			
 		case DIG_CHKDW:
@@ -411,9 +463,10 @@ ERR_SIG Sig_LandDw(void)
 				Sta_SigLandDw = DIG_WAIT_LIHE;
 				SET_TIME;
 			}
-			if(g_st_SigData.m_HeightShowCm > (g_sys_para.s_sethighcm + 120))	// over 
+			if(g_st_SigData.m_HeightShowCm > (g_sys_para.s_sethighcm + 120))	// 黏离合的保护超程为1.2米
 			{
 				err_dw = ERR_SIG_CLING;
+				Log_e("ERR_SIG_CLING");
 			}else if(CHECK_TIMEOUT(2000))
 			{
 				Sta_SigLandDw = DIG_BLOCKED;
@@ -466,7 +519,7 @@ ERR_SIG Sig_LandDw(void)
 				err_dw = ERR_SIG_REACHDW;
 				Log_e("ERR_SIG_REACHDW");
 			}
-			if(CHECK_TIMEOUT(5000))
+			if(CHECK_TIMEOUT(6000))       /*该时间需要继续判断*/
 			{
 				err_dw = ERR_SIG_TIMOUT;
 				Log_e("ERR_SIG_TIMOUT");
@@ -474,17 +527,25 @@ ERR_SIG Sig_LandDw(void)
 				
 			break;
 		
-		default:break;
+		default:
+			Log_e("Not Exist");
+			break;
 	}
-	if(err_dw > ERR_SIG_REACHDW)
-		Log_e("%d  %d",Sta_SigLandDw,err_dw);
 	
 	return err_dw;
 }
 
 
 
-
+/************************************************************
+  * @brief   得到编码器速度，带方向，向上为正
+  * @param   none
+  * @return  cm/s
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    内部滤波处理
+  ***********************************************************/
 int GetEncoderSpeedCm(void)
 {
 	float ftmp;
@@ -501,6 +562,15 @@ int GetEncoderSpeedCm(void)
 	return ret;
 }
 
+/************************************************************
+  * @brief   得到编码器速度，带方向，向上为正
+  * @param   none
+  * @return  cm/s
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    内部滤波处理
+  ***********************************************************/
 int GetEncoderAcceCm(void)
 {
 	float ftmp;
@@ -512,7 +582,15 @@ int GetEncoderAcceCm(void)
 	ret = (int)ftmp;
 	return ret;
 }
-
+/************************************************************
+  * @brief   得到速度1，用于打锤的计量，带方向，向上为正
+  * @param   none
+  * @return  cm/s
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    内部滤波处理
+  ***********************************************************/
 int GetEncoderLen1Cm(void)
 {
 	float ftmp;
@@ -524,7 +602,15 @@ int GetEncoderLen1Cm(void)
 	ret = (int)ftmp;
 	return ret;
 }
-
+/************************************************************
+  * @brief   得到编码器方向，用于夯土流程，带方向，向上为正
+  * @param   none
+  * @return  cm/s
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    none
+  ***********************************************************/
 int GetEncoderLen2Cm(void)
 {
 	float ftmp;
@@ -537,7 +623,15 @@ int GetEncoderLen2Cm(void)
 	return ret;
 }
 
-/*计算出有功功率比值对应的实际功率*/
+/************************************************************
+  * @brief   计算实际有效值的比例
+  * @param   0-100  
+  * @return  cm/s
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    none
+  ***********************************************************/
 int32_t Per2Power(int16_t  percent)
 {
 	uint32_t pw;

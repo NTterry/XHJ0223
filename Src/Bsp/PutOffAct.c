@@ -20,7 +20,7 @@
 
 #ifdef USE_LIHE_PWM
 	int gLiheRatio = 0;		//比值 1 - 10
-	int LiheRLY	 = 0;
+	int LiheRLY	 = ACT_OFF;
 #endif
 
 /*离合动作和刹车动作共用的标准数据*/

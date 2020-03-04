@@ -22,7 +22,8 @@ Date		:2017.07.7  - 2017.9.11
 #define USE_LIHE_PWM
 
 #ifdef USE_LIHE_PWM
-	#define LIHE_PWM		5
+	#define LIHE_TINY		5
+	#define LIHE_BIG		10
 #endif
 
 
