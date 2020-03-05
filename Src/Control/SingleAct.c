@@ -10,7 +10,7 @@
 
 
 #define GET_SYS_TIMEMS()	osKernelSysTick()
-#define DEF_TIMEOUT		static uint32_t s_pre_time
+#define DEF_TIMEOUT		static uint32_t s_pre_time = 0
 #define SET_TIME		s_pre_time = GET_SYS_TIMEMS()
 #define LAST_TIME		GET_SYS_TIMEMS()
 #define CHECK_TIMEOUT(x) (((GET_SYS_TIMEMS() - s_pre_time) > x) ? 1 : 0)
@@ -19,6 +19,7 @@
 static enum ACT_SINGLE_UP Sta_SigTakeUp;     //提锤检测状态
 static enum ACT_SINGLE_DW Sta_SigLandDw;     //下锤检测状态
 static int Sta_Stuck = 0;					 //堵转检测状态
+static int Sta_Break = 0;					 //
 
 struct SIG_ACT_DATA g_st_SigData;			 //打锤时的实时高度，速度信息
 
@@ -43,33 +44,38 @@ void GetLiveData(void)
 /*
 	work up check  if proper taking up
 	return if it back to normal
-	
+	提锤发生下滑检测
 */
 static ERR_SIG BreakOff_Check(int power,int speedcm)
 {
 	DEF_TIMEOUT;
 	ERR_SIG ret = ERR_SIG_OK;
-	
-	if((speedcm > VALID_MIN_CM) && (power > Per2Power(VALID_POWM)) && (power < Per2Power(VALID_POWOVER)))
+	switch(Sta_Break)
 	{
-		SET_TIME;
-		ret = ERR_SIG_OK;
+		case 0:
+			if(speedcm < -VALID_MIN_CM)
+			{
+				Sta_Break  = 1;
+			}
+			SET_TIME;
+			break;
+		case 1:
+			if(speedcm < 0)
+			{
+				if(CHECK_TIMEOUT(2000))
+				{
+					if(power > Per2Power(VALID_POWM))
+						ret = ERR_SIG_PULLUP;
+					else
+						ret = ERR_SIG_SOFT;
+					Log_e("break off");
+				}
+			}
+			else
+				Sta_Break = 0;
+		     break;
+		default:Sta_Break = 0;break;
 	}
-	else if((speedcm < VALID_MIN_CM) && (power > Per2Power(VALID_POWOVER)))
-	{
-		if(CHECK_TIMEOUT(1000))  
-			ret = ERR_SIG_PULLUP;
-	}
-	else if((speedcm < VALID_MIN_CM) && (power > Per2Power(VALID_POWM)))
-	{
-		if(CHECK_TIMEOUT(3000))  
-			ret = ERR_SIG_ENCODER;
-	}else
-	{
-		if(CHECK_TIMEOUT(3000))  
-			ret = ERR_SIG_SOFT;
-	}
-	
 	return ret;
 }
 
@@ -147,6 +153,7 @@ void Sig_ResetSta(void)
   * @version v1.0
   * @note    故障判断，超时时间由提锤高度确定
   ***********************************************************/
+  extern struct RECORD s_record;	
 ERR_SIG Sig_TakeUp(void)
 {
 	DEF_TIMEOUT;
@@ -200,9 +207,12 @@ ERR_SIG Sig_TakeUp(void)
 						gLiheRatio = LIHE_BIG;
 						Log_e("大力");
 #endif
+					Sta_Stuck = 0;		/*下一环节的判断状态清零*/
+					Sta_Break = 0;
 					Sta_SigTakeUp = SIG_WORKUP;
 					Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 					Enc_Clr_TotalCnt1();
+					s_record.deepth = g_st_SigData.m_HeighRammCm;
 					StartTim = SET_TIME;
 				}
 			}
@@ -234,6 +244,7 @@ ERR_SIG Sig_TakeUp(void)
 				g_st_SigData.m_Lihenew = g_sys_para.s_setlihecm * g_st_SigData.m_HeightShowCm / g_sys_para.s_sethighcm;// 比例更新离合点的高度
 				/*更新离合点的高度*/
 				Sta_SigTakeUp = SIG_REACH_TOP;
+				Log_e("%d  %d",g_st_SigData.m_HeighRammCm,g_sys_para.s_hprot);
 			}
 			else if(g_st_SigData.m_HeightShowCm > g_sys_para.s_sethighcm)
 			{
@@ -246,7 +257,6 @@ ERR_SIG Sig_TakeUp(void)
 				if(g_st_SigData.m_HeightShowCm > 100)
 				{
 					gLiheRatio = LIHE_TINY;			//小力
-					Log_e("小力");
 				}
 #endif
 				err_sta = BreakOff_Check(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm);
@@ -257,6 +267,7 @@ ERR_SIG Sig_TakeUp(void)
 			if(Stuck_Ckeck(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm))  // if Blocked
 			{
 				Sta_SigTakeUp = SIG_BLOCKED;
+				Log_e("Blocked");
 				G_LIHE(ACT_OFF,200);
 				G_SHACHE(ACT_ON,0);
 				SET_TIME;

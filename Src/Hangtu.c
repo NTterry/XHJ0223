@@ -887,7 +887,7 @@ static SYS_STA hangtu(uint16_t * pst)
 					
 					Log_e("溜放成功,准备打锤");
                     *pst = S_DACHUI;       										/*开始打锤 */
-				
+					Sig_ResetSta();
 					SIGACT_READY;	/*打锤准备*/
                 }
             }else if(tmp > 1)       											/*溜放错误*/
@@ -897,46 +897,58 @@ static SYS_STA hangtu(uint16_t * pst)
             }
             break;
         case S_DACHUI:
-			RecordIn(M_ACT,1);  
-			
-			ret = SingleAct(1);
-			if(ret > ERR_SIG_REACHDW)		/*发生错误*/
-			{
-				Halt_Stop();
-				g_st_SigData.m_Mode = MOD_FREE;
-				Log_e("打锤错误");
-			}
-			else
-			{
-				if(ret == ERR_SIG_REACHDW)
+		    {
+				ERR_SIG sig_err = 0;
+				
+				RecordIn(M_ACT,1);  
+				
+				sig_err = SingleAct(1);
+				if((sig_err > ERR_SIG_REACHDW) ||g_halt)		/*发生错误*/
 				{
-					
-					s_hang.dachui_cnt--;
-					Log_e("打锤到底 %d",s_hang.dachui_cnt);
-					if(s_hang.dachui_cnt < 1)
+					Halt_Stop();
+					g_st_SigData.m_Mode = MOD_FREE;
+					Log_e("打锤错误");
+					switch(sig_err)
 					{
-						if(s_record.deepth > -50)			/*表示夯土结束  Terry 2019.10.18 */
-						{
-							g_st_SigData.m_Mode = MOD_FREE;	/*直接退出  2019.8.2*/
-							G_SHACHE(ACT_ON,0);
-							G_LIHE(ACT_OFF,200);
-							*pst = S_IDLE;
-						}
-						else
-						{
-							*pst = S_PULSE;       			/*下一轮提锤操作   直接提锤*/
-							Log_e("提锤");
-						}					
+						case ERR_SIG_PULLUP :ret|= ERR_LS;break;
+						case ERR_SIG_ENCODER:ret|= ERR_TT;break;
+						case ERR_SIG_CUR    :ret|= ERR_CT;break;
+						case ERR_SIG_CLING  :ret|= ERR_NC;break;
+						case ERR_SIG_BRAKE  :ret|= ERR_KC;break;
+						case ERR_SIG_TIMOUT :ret|= ERR_CS;break;
+						default:ret|= ERR_CHAO;break;
 					}
 				}
-			}
-            if(ret == ERR_NONE)
-            {
-				RecordIn(M_ACT,0);		           /*提锤标志 Terry 2019.7.6*/			
-                ret = Sig_LandDw();					/*堵塞模式*/
-            }
-            break;
-    }
+				else
+				{
+					if(sig_err == ERR_SIG_REACHDW)
+					{
+						s_hang.dachui_cnt--;
+						Log_e("打锤到底 %d",s_hang.dachui_cnt);
+						if(s_hang.dachui_cnt < 1)
+						{
+							if(s_record.deepth > -50)			/*表示夯土结束  Terry 2019.10.18 */
+							{
+								g_st_SigData.m_Mode = MOD_FREE;	/*直接退出  2019.8.2*/
+								G_SHACHE(ACT_ON,0);
+								G_LIHE(ACT_OFF,200);
+								*pst = S_IDLE;
+							}
+							else
+							{
+								*pst = S_PULSE;       			/*下一轮提锤操作   直接提锤*/
+								Log_e("提锤");
+							}					
+						}
+					}
+				}
+				if(ret == ERR_NONE)
+				{
+					RecordIn(M_ACT,0);		           /*提锤标志 Terry 2019.7.6*/			
+				}
+				break;
+		}
+	}
     /*Switch 结束*/
     if(g_halt)
     {
