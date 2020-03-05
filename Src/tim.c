@@ -328,13 +328,12 @@ int16_t Etr_GetCount(void)
 	return Angle;
 }
 
-
+#include "PutOffAct.h"
 /*编码器计数 1ms 定时中断里面*/
-extern void Lihe_Poll_Ms(void);
 void Sys_TickCallBack()
 {  
 	HwEcTimerTick1ms();
-	Lihe_Poll_Ms();
+	Lihe_Generate_PWM();
 }
 
 /*编码器引脚改外部中断引脚*/

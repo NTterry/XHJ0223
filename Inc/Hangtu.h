@@ -7,7 +7,7 @@
 #include "Action.h"
 #include "PutOffAct.h"
 
-SYS_STA services(void);
+SYS_STA ServicesLoop(void);
 
 
 #define M_NUB		0
@@ -37,6 +37,9 @@ SYS_STA services(void);
 
 #define LED_BIT_SET(x)		g_led_sta |= x
 #define LED_BIT_CLR(x)		g_led_sta &= ~x
+
+
+
 
 
 extern void ModbusData_Init(void);

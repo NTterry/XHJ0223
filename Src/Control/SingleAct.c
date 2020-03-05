@@ -30,6 +30,16 @@ int GetEncoderLen1Cm(void);
 int GetEncoderLen2Cm(void);
 int32_t Per2Power(int16_t  percent);
 
+
+
+void GetLiveData(void)
+{
+	g_st_SigData.m_HeightShowCm = GetEncoderLen1Cm();
+	g_st_SigData.m_Power = Get_FRQE2();
+	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
+	g_st_SigData.m_HeighRammCm = GetEncoderLen2Cm();
+}
+
 /*
 	work up check  if proper taking up
 	return if it back to normal
@@ -145,10 +155,6 @@ ERR_SIG Sig_TakeUp(void)
 	static uint32_t StartTim = 0;
 	static uint32_t ClrNullCnt = 0;
 	
-	g_st_SigData.m_HeightShowCm = GetEncoderLen1Cm();
-	g_st_SigData.m_Power = Get_FRQE2();
-	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
-	
 	switch(Sta_SigTakeUp)
 	{
 		case SIG_IDLE:
@@ -223,9 +229,16 @@ ERR_SIG Sig_TakeUp(void)
 			break;
 			
 		case SIG_WORKUP:	// 此处高度不清零了，清零可能导致更多的问题
-			if(g_st_SigData.m_HeightShowCm > g_sys_para.s_sethighcm)
+			if((g_st_SigData.m_HeighRammCm >  g_sys_para.s_hprot) && g_sys_para.s_mode)     /*夯土模式下，设定保护高度*/
+			{
+				g_st_SigData.m_Lihenew = g_sys_para.s_setlihecm * g_st_SigData.m_HeightShowCm / g_sys_para.s_sethighcm;// 比例更新离合点的高度
+				/*更新离合点的高度*/
+				Sta_SigTakeUp = SIG_REACH_TOP;
+			}
+			else if(g_st_SigData.m_HeightShowCm > g_sys_para.s_sethighcm)
 			{
 				Sta_SigTakeUp = SIG_REACH_TOP;
+				g_st_SigData.m_Lihenew = g_sys_para.s_setlihecm;   //正常更新离合点的高度
 			}
 			else
 			{
@@ -308,10 +321,6 @@ ERR_SIG Sig_StudyUp(void)
 	ERR_SIG err_sta = ERR_SIG_OK;
 	static int dir_sure = 0,dir_cnt = 0;
 	
-	g_st_SigData.m_HeightShowCm = GetEncoderLen1Cm();
-	g_st_SigData.m_Power = Get_FRQE2();
-	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
-	
 	switch(Sta_SigTakeUp)
 	{
 		case SIG_IDLE:
@@ -375,6 +384,7 @@ ERR_SIG Sig_StudyUp(void)
 				if(g_st_SigData.m_HeightShowCm > g_sys_para.s_sethighcm / 2)
 				{
 					g_sys_para.s_pfull = g_st_SigData.m_Power; // 超过设定一半时，保存有效拉力值
+					g_st_SigData.m_Lihenew = g_sys_para.s_setlihecm;
 					Sta_SigTakeUp = SIG_WORKUP;
 				}
 				SET_TIME;
@@ -441,10 +451,6 @@ ERR_SIG Sig_LandDw(void)
 	static int32_t s_ClingCnt = 0;
 	
 	ERR_SIG err_dw = ERR_SIG_OK;
-	
-	g_st_SigData.m_HeightShowCm = GetEncoderLen1Cm();
-	g_st_SigData.m_Power = Get_FRQE2();
-	g_st_SigData.m_SpeedCm = GetEncoderSpeedCm();
 	
 	switch(Sta_SigLandDw)
 	{
@@ -514,7 +520,7 @@ ERR_SIG Sig_LandDw(void)
 			break;
 			
 		case DIG_WAIT_LIHE:
-			if(g_st_SigData.m_HeightShowCm < g_sys_para.s_hlihe)
+			if(g_st_SigData.m_HeightShowCm < g_st_SigData.m_Lihenew)    //与更新后离合点的高度比较
 			{
 				err_dw = ERR_SIG_REACHDW;
 				Log_e("ERR_SIG_REACHDW");
@@ -553,7 +559,7 @@ int GetEncoderSpeedCm(void)
 	static int prespeed = 0;
 	
 	ftmp = Enc_Get_SpeedE1();
-	ftmp = ftmp * g_sys_para.s_zhou / g_sys_para.s_numchi;
+	ftmp = ftmp * g_sys_para.s_pericm / g_sys_para.s_numchi;
 	ftmp = ftmp / 10;
 	ret = (int)ftmp;
 	
@@ -577,7 +583,7 @@ int GetEncoderAcceCm(void)
 	int ret;
 	
 	ftmp = Enc_Get_Acce();
-	ftmp = ftmp * g_sys_para.s_zhou / g_sys_para.s_numchi;
+	ftmp = ftmp * g_sys_para.s_pericm / g_sys_para.s_numchi;
 	
 	ret = (int)ftmp;
 	return ret;
@@ -597,7 +603,7 @@ int GetEncoderLen1Cm(void)
 	int ret;
 	
 	ftmp = Enc_Get_CNT1();
-	ftmp = ftmp * g_sys_para.s_zhou / g_sys_para.s_numchi;
+	ftmp = ftmp * g_sys_para.s_pericm / g_sys_para.s_numchi;
 	
 	ret = (int)ftmp;
 	return ret;
@@ -617,7 +623,7 @@ int GetEncoderLen2Cm(void)
 	int ret;
 	
 	ftmp = Enc_Get_CNT2();
-	ftmp = ftmp * g_sys_para.s_zhou / g_sys_para.s_numchi;
+	ftmp = ftmp * g_sys_para.s_pericm / g_sys_para.s_numchi;
 	
 	ret = (int)ftmp;
 	return ret;

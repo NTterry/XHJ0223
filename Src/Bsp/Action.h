@@ -60,7 +60,7 @@ enum emWORKMODE
     MOD_FREE = 0,
     MOD_SIGACT,
     MOD_AUTOTAMP,       /*自动夯土流程*/
-    MOD_MAN,
+    MOD_MANUAL,
     MOD_MANOFF,
     MOD_TST,
     MOD_DOWN,       /*手动溜放模式  Terry 2019.5.21*/
@@ -88,9 +88,10 @@ struct HANGTU
     int32_t dachui_cnt;     /*打锤的次数*/
     int32_t liufang_sta;    /*溜放状态检测*/
     int32_t top_sta;        /*到顶状态检测*/
-	int32_t stop_sta;
-    int32_t surecnt;
+	int32_t stop_sta;		/*上拉到顶停机状态检测*/
+    int32_t surecnt;		
 	int16_t last_downnum;   /*上次溜放的齿数*/
+	int16_t last_sta;
 };    
 
 
@@ -115,32 +116,22 @@ struct HANGTU
 
 
 /**********************记录的数据结构********************************************/
-/*		实时数据		*/
-struct STADATA
-{
-//	struct EncoderCnt m_high;			//当前高度，速度，方向
-	struct EtrCnt m_power;
-	int32_t clihe;						//计算出来的离合点  齿数
-	int16_t TTCHK;						/*检测的有无探头 0 无探头 1 有探头*/
-	uint16_t Topsignal;					/*到顶的开关信号*/
-};
 
 /*系统属性，设置数据*/
 __packed struct SYSATTR
 {
 	uint32_t s_chickid;					/*校验码  0xA5A6A7A8*/
 	int32_t s_sethighcm;				//厘米
-	int32_t s_hlihe;					//厘米			设定的离合高度
-	int32_t s_zhou;						//卷筒周长  厘米
+	int32_t s_setlihecm;				//厘米			设定的离合高度
+	int32_t s_pericm;					//卷筒周长  厘米
 	int32_t s_numchi;					//每周齿数  个数
 	int32_t s_pnull;					/*空载时的平均功率*/
 	int32_t s_pfull;					/*满载时的平均功率*/
-	int32_t s_cnt;                      /*夯土次数  3-10次 Terry 2019.5.21  */
+	int32_t s_rammcnt;                      /*夯土次数  3-10次 Terry 2019.5.21  */
 	uint32_t s_dir;						/*编码器方向标志信号*/
 	int32_t s_hprot;					/*高度保护设置 默认 300cm*/
 	int16_t s_pset;						/*永久授权模式*/
-	uint8_t s_intval;					/*双打间隔时间，单位 0.1秒   改成 送料时间 Terry 2019.5.21  单位 秒  2-15秒*/
-	int8_t  s_cmode;					/*自动打标志  0 空闲  1 探头模式自动打 2 无探头模式自动打 3 测试模式*/
+	uint8_t s_feedtims;					/*双打间隔时间，单位 0.1秒   改成 送料时间 Terry 2019.5.21  单位 秒  2-15秒*/
 	int8_t  s_mode;						/*0 单打  1 表示双打*/
 };
 
@@ -157,7 +148,6 @@ __packed struct LIHEDATA			/*离合与松弛度的中间计算值*/
 	int32_t powerave;				/*上拉时的平均功率*/
 	uint32_t uptime;
 	int16_t	songchi;				/*松弛度，为0 时表示正在适应，为1时表示在自动调整中*/
-	
 };
 
 
@@ -195,7 +185,7 @@ typedef __packed struct SPEED
 #define HALT_BREAK	{			\
 						if(g_halt)	\
 						{status |= ERR_HALT; break;}  \
-                        if(g_sys_para.s_cmode == MOD_FREE)\
+                        if(g_st_SigData.m_Mode == MOD_FREE)\
                             break;\
 					}
 
@@ -211,11 +201,6 @@ extern volatile uint8_t sys_fbsta;						// 外部反馈信号
 //void GetEncode(uint32_t dir, struct EncoderCnt *p);
 /*获得当前功率*/
 void GetPower(struct EtrCnt *p);
-
-
-
-
-
 
 /********无探头提锤动作***********/
 SYS_STA ntakeup(void);
@@ -233,8 +218,7 @@ void G_LIHE(uint32_t sta, uint32_t delay);
 void G_SHACHE(uint32_t sta, uint32_t delay);
 void G_SHACHE_SG(uint32_t sta, uint32_t delay);     //不带辅助信号
 void liheupdate(void);//更新离合参数值
-//反馈信号的检测
-void FB_CHECK(void);
+
 uint16_t Shache_Proc(void);
 //void EncoderClr(struct EncoderCnt *p);
 

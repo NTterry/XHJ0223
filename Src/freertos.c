@@ -61,7 +61,6 @@ osThreadId ActionTaskHandle;
 void StartDefaultTask(void const * argument);
 void StartTask02(void const * argument);
 void StartTask03(void const * argument);
-SYS_STA services(void);
 /* USER CODE BEGIN FunctionPrototypes */
 
 /* USER CODE END FunctionPrototypes */
@@ -107,7 +106,7 @@ void MX_FREERTOS_Init() {
   NomalTaskHandle = osThreadCreate(osThread(NomalTask), NULL);
   
   /* 主工作任务*/
-  osThreadDef(ActionTask, StartTask03, osPriorityHigh, 0, 768);
+  osThreadDef(ActionTask, StartTask03, osPriorityHigh, 0, 1024);
   ActionTaskHandle = osThreadCreate(osThread(ActionTask), NULL);
   /*Modbus 通信任务*/
   osThreadDef(CLITask, ModbusComm, osPriorityBelowNormal, 0, 512);
@@ -123,7 +122,6 @@ void Timer3_CallBack(void)
 /* StartTask03 function 
 	主业务程序
 */
-extern uint32_t g_errshow;
 void StartTask03(void const * argument)
 {
 	SYS_STA status;
@@ -133,15 +131,12 @@ void StartTask03(void const * argument)
 	for(;;)
 	{
 		/*有探头一键启动模式*/
-		status = services();
-			
+		status = ServicesLoop();	
 		if(status > ERR_NONE)	//传递错误
 		{
 			Log_e("%x",status);
-			g_errshow = status;
-			
 		}
-		
+		osDelay(HANG_TICK);
 	}
   /* USER CODE END StartTask03 */
 }

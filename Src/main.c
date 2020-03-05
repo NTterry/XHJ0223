@@ -199,7 +199,6 @@ void StartDefaultTask(void const * argument)
 #endif
 	
 	/* USER CODE END 2 */
-//	HAL_TIM_Base_Start(&htim2);	//开启计数
 	IC_Mens_Init();
   /* Infinite loop */
 	for(;;)										// 10ms per ticks
@@ -212,14 +211,11 @@ void StartDefaultTask(void const * argument)
 		
 		if((i % 17) == 1)	
 			Speed_Send();   /*定时向刹车板发送速度信号*/
-			
-//		printf("%d\t",Get_FRQE2());		
-
+				
 		osDelay(10);
         
+		/*指示灯 的显示 */
 	  	(g_st_SigData.m_Power > 5)? (LED_BIT_SET(SIG_CUR)): (LED_BIT_CLR(SIG_CUR));
-	
-			
 		Dsp_BarLight(g_led_sta,0);  	/*LED 指示显示*/
 		
 #if (WCH_DOG == 1)

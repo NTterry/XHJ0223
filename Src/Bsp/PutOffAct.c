@@ -38,18 +38,6 @@ static volatile struct ACT_STA g_alihe,g_shache;		//离合 刹车 动作控制  需要初始
 static enum SC sact;                					//刹车执行的状态机
 
 
-
-
-
-/*返回反馈信号*/
-int8_t Get_Fbsignal(uint8_t MASK)
-{
-	if(sys_fbsta & MASK)
-		return 1;
-	else
-		return 0;
-}
-
 /*计算当前的时间间隔*/
 static uint32_t HAL_MS_DIFF(uint32_t pretime)
 {
@@ -98,7 +86,6 @@ void G_SHACHE(uint32_t sta, uint32_t delay)
 /* 离合动作   如果延时为0时，立即执行*/
 void G_LIHE(uint32_t sta, uint32_t delay)
 {
-//	portENTER_CRITICAL();
 	g_alihe.delay = delay / T_ACT_MS;
 	g_alihe.sta = sta;
 	if((delay == 0) && (sta == ACT_ON))
@@ -115,13 +102,13 @@ void G_LIHE(uint32_t sta, uint32_t delay)
 		C_SONGLIHE();
 #else
 		LiheRLY = sta;
+		
 #endif
 	}	
-//	portEXIT_CRITICAL();
 }
 
 
-void Lihe_Poll_Ms(void)
+void Lihe_Generate_PWM(void)
 {
 #ifdef USE_LIHE_PWM
 	static int scnt;
@@ -141,7 +128,7 @@ void Lihe_Poll_Ms(void)
 }
 
 
-uint16_t Shache_Proc(void)
+static uint16_t Shache_Proc(void)
 {
     static uint32_t sctime;
 	int16_t ledsta = 0;
@@ -218,9 +205,10 @@ uint16_t Shache_Proc(void)
   * 输入参数： 无
 
   * 返回值: 无
-  * 说明: 调用任务 StartDefaultTask  每 CALUTICK 毫秒执行一次
+  * 说明: 调用任务 StartDefaultTask  每 10 毫秒执行一次
+  * 到达设定时间后，执行
   */
-void g_action(void)
+static void g_action(void)
 {	 
     if(g_alihe.delay > 0)
     {
@@ -253,8 +241,6 @@ void g_action(void)
 	if(g_shache.delay == 0)
     {
         g_shache.pact = g_shache.sta;
-//		Log_e("Shache Zero");
-	
     } 
     if(g_shache.delay >= 0)
     {

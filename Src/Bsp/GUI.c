@@ -18,8 +18,7 @@ extern struct SIG_ACT_DATA g_st_SigData;
 
 
 
-uint32_t g_errshow;
-uint16_t g_errnum;		/*错误编号*/
+uint32_t g_errshow;	/*错误编号*/
 volatile struct GUI_DATA	g_GuiData;
 
 
@@ -47,26 +46,26 @@ void SetSaveFlag(void)
 
 void GuiDataUpdate(void)
 {
-	if(g_sys_para.s_hlihe != g_GuiData.g_lihe)
+	if(g_sys_para.s_setlihecm != g_GuiData.g_lihe)
 	{
-		g_sys_para.s_hlihe = g_GuiData.g_lihe;
+		g_sys_para.s_setlihecm = g_GuiData.g_lihe;
 
 
-		liheupdate();		//更新离合参数值
+//		liheupdate();		//更新离合参数值
 		s_savecnt = 20;
 	}
 
 	if(g_GuiData.g_sethighcm != g_sys_para.s_sethighcm)		//更新高度
 	{
 		g_sys_para.s_sethighcm = g_GuiData.g_sethighcm;
-		liheupdate();		//更新离合参数值
+//		liheupdate();		//更新离合参数值
 		s_savecnt = 20;
 	}
 	/*每圈齿数*/
 	if(g_GuiData.g_num != g_sys_para.s_numchi)
 	{
 		g_sys_para.s_numchi = g_GuiData.g_num;
-		liheupdate();		//更新离合参数值
+//		liheupdate();		//更新离合参数值
 		s_savecnt = 20;
 	}
 	/*单双打模式*/
@@ -76,22 +75,22 @@ void GuiDataUpdate(void)
 		s_savecnt = 20;
 	}
 	/*双打间隔时间*/
-	if(g_GuiData.g_ts != g_sys_para.s_intval)
+	if(g_GuiData.g_ts != g_sys_para.s_feedtims)
 	{
-		g_sys_para.s_intval = g_GuiData.g_ts;
+		g_sys_para.s_feedtims = g_GuiData.g_ts;
 		s_savecnt = 20;
 	}
 	/*夯土次数    Terry 2019.5.21*/
-	if(g_GuiData.g_hcnt != g_sys_para.s_cnt)
+	if(g_GuiData.g_hcnt != g_sys_para.s_rammcnt)
 	{
-		g_sys_para.s_cnt = g_GuiData.g_hcnt;
+		g_sys_para.s_rammcnt = g_GuiData.g_hcnt;
 		s_savecnt = 20;
 	}
 
 	/*周长  厘米 */
-	if(g_GuiData.g_Zhoucm != g_sys_para.s_zhou)
+	if(g_GuiData.g_Zhoucm != g_sys_para.s_pericm)
 	{
-		g_sys_para.s_zhou = g_GuiData.g_Zhoucm;
+		g_sys_para.s_pericm = g_GuiData.g_Zhoucm;
 		s_savecnt = 20;
 	}
 	/*Terry add 2019.7.6 设置的上拉超限的高度*/
@@ -106,7 +105,7 @@ void GuiDataUpdate(void)
 }
 
 
-extern int8_t Get_Fbsignal(uint8_t MASK);
+//extern int8_t Get_Fbsignal(uint8_t MASK);
 extern struct Locationcm user_encoder;   
 
 void Task_GUI_Function(void) 
@@ -124,14 +123,14 @@ void Task_GUI_Function(void)
 			}
 			else	
 			{
-				if(g_sys_para.s_cmode == MOD_SIGACT)
+				if(g_st_SigData.m_Mode == MOD_SIGACT)
 				{
-					g_GuiData.g_show = GetEncoderLen1Cm() / 10;
+					g_GuiData.g_show = g_st_SigData.m_HeightShowCm / 10;
 					g_GuiData.g_nhigh = g_GuiData.g_show;							/*分米*/
 				}
 				else
 				{
-					g_GuiData.g_show = GetEncoderLen2Cm() / 10;				 //单位 0.1米
+					g_GuiData.g_show = g_st_SigData.m_HeighRammCm / 10;				 //单位 0.1米
 					g_GuiData.g_nhigh = g_GuiData.g_show;							/*分米*/
 					g_GuiData.g_show = g_GuiData.g_show / 10;		/*夯土时 控制器只能显示米 Terry 2019.7.5*/
 				}
@@ -183,9 +182,8 @@ void Task_GUI_Function(void)
 	show_brush();
 	savedatas();
 	/*无错误且急停未按下时，急停OK不断开*/
-	if((g_errshow) || g_halt)
+	if((g_st_SigData.m_errshow) || g_halt)
 	{
-//		Log_e("%x,%d",g_errshow,g_halt);
 		C_STOP();
 	}
 	else
@@ -205,11 +203,11 @@ void savedatas(void)
 	{
 		if(g_sys_para.s_dir > 1)
 			g_sys_para.s_dir = 1;
-		if((sys_fbsta & FB_24VOK))
-		{
+//		if((sys_fbsta & FB_24VOK))
+//		{
 			EE_DatasWrite(DATA_ADDRESS,(uint8_t *)&g_sys_para,sizeof(g_sys_para));
 //			if((status == HAL_OK) && (s_ht1632_test))
-		}
+//		}
 		s_savecnt = 72000;		// 2H后再自动保存数据
 		osDelay(2);
 	}
@@ -227,15 +225,14 @@ void GUI_Init(void)
 	g_GuiData.g_index = 0;
 	g_GuiData.g_HasChanged = 1;
 	g_GuiData.g_sethighcm = g_sys_para.s_sethighcm;
-	g_GuiData.g_lihe = g_sys_para.s_hlihe;
+	g_GuiData.g_lihe = g_sys_para.s_setlihecm;
 	g_GuiData.g_num = g_sys_para.s_numchi;
-	g_GuiData.g_ts = g_sys_para.s_intval;
-	g_GuiData.g_Zhoucm = g_sys_para.s_zhou;
+	g_GuiData.g_ts = g_sys_para.s_feedtims;
+	g_GuiData.g_Zhoucm = g_sys_para.s_pericm;
 	g_GuiData.g_mode = g_sys_para.s_mode;
-    g_GuiData.g_hcnt = g_sys_para.s_cnt;
+    g_GuiData.g_hcnt = g_sys_para.s_rammcnt;
 	g_GuiData.g_HighOvercm = g_sys_para.s_hprot;			/*Terry 2019.7.6*/
 	
-	liheupdate();										//更新离合参数值
 	HT1632_Init();
 	s_ht1632_test = 0;										//测试标志
 	s_liheblink = 0;
@@ -253,7 +250,7 @@ void GUI_showdata(void)
 	
 	tmp = g_GuiData.g_sethighcm / 50;     						/*0 - 24对应 0 - 12米  Terry  2019.5.21*/	
 	tmp1 = g_GuiData.g_lihe/50;								/*直接显示离合点  2019.6.5*/
-	LPosCm = GetEncoderLen1Cm();
+	LPosCm = g_st_SigData.m_HeightShowCm;
     if(LPosCm > 0)
         high = LPosCm / 50;      /*0-24对应  0 - 12米  Terry 2019.5.21*/
     else
@@ -263,7 +260,7 @@ void GUI_showdata(void)
 	if(s_liheblink > 0)  s_liheblink--;
 	if(s_highblink > 0)  s_highblink--;
 		
-	if(g_errshow == ERR_NONE)
+	if(g_st_SigData.m_errshow == ERR_NONE)
 	{
 		/*正常显示了*/
         if(s_liheblink|s_highblink)
@@ -272,7 +269,7 @@ void GUI_showdata(void)
 		}
         else if(g_GuiData.g_index == SHOW_NONE)
 		{
-            if(g_sys_para.s_cmode == MOD_SIGACT)
+            if(g_st_SigData.m_Mode == MOD_SIGACT)
 				Dsp_Num(g_GuiData.g_show,1,0);
 			else
 				Dsp_Num(g_GuiData.g_show,0,0);			/*夯土模#式，电脑显示 米*/
@@ -283,13 +280,13 @@ void GUI_showdata(void)
 		}
 			
 		BUZZER(0);
-		g_errnum = 0;
+		g_st_SigData.m_errnum = 0;
 	}
 	else
 	{
 		
-		tmp = get_errnum(g_errshow);		//显示故障代号
-		g_errnum = tmp;
+		g_st_SigData.m_errnum = get_errnum(g_st_SigData.m_errshow);		//显示故障代号
+		tmp = g_st_SigData.m_errnum;
 		if(tmp < 10)
 		{
 			Dsp_Num(tmp,0,LEDCODE[19]);  // P与E
@@ -309,7 +306,6 @@ void GUI_showdata(void)
 			}
 		}
 	}
-	
 	/*选择指示灯和模式指示灯*/
 	Dsp_setled(g_GuiData.g_index,0,g_GuiData.g_mode);
 }
@@ -343,6 +339,10 @@ int16_t get_errnum(uint32_t err)
 	else if(err & ERR_HALT) ret = 16;
 	else if(err & ERR_ACE)  ret = 18; /*Terry add 2019.7.6*/
 	
+//	if(err)
+//	{
+//		Log_e("err %x,ret %d",err,ret);
+//	}
 	return ret;
 }
 
@@ -366,15 +366,9 @@ void clear_err(uint32_t *perr)
 	else if(*perr & ERR_CT) *perr &=  ~ERR_CT;
 	else if(*perr & ERR_HALT) *perr &=  ~ERR_HALT;
 	else if(*perr & ERR_ACE) *perr &=  ~ERR_ACE;
-
 }
 
 
-
-void clear_all(void)
-{
-	g_errshow = 0;
-}
 
 void CmdProc(void)
 {
@@ -540,8 +534,8 @@ void Key_LiheDwL(void)
 void Key_Set(void)
 {
 	IOT_FUNC_ENTRY;
-	if(g_errshow)
-		clear_err(&g_errshow);
+	if(g_st_SigData.m_errshow)
+		clear_err(&g_st_SigData.m_errshow);
 	else if(g_GuiData.g_index == SHOW_BACKSET)
 	{
 		/*后台处理设置*/
@@ -559,8 +553,8 @@ void Key_Set(void)
 void Key_Add(void)
 {
 	IOT_FUNC_ENTRY;
-	if(g_errshow)
-	clear_err(&g_errshow);
+	if(g_st_SigData.m_errshow)
+		clear_err(&g_st_SigData.m_errshow);
 	else
 	{
 	switch(g_GuiData.g_index)
@@ -603,8 +597,8 @@ void Key_Add(void)
 void Key_Sub(void)
 {
 	IOT_FUNC_ENTRY;
-	if(g_errshow)
-		clear_err(&g_errshow);
+	if(g_st_SigData.m_errshow)
+		clear_err(&g_st_SigData.m_errshow);
 	else
 	{
 		switch(g_GuiData.g_index)
@@ -651,7 +645,7 @@ void Key_ModLong(void)
 {
 	IOT_FUNC_ENTRY;
 	
-	if((g_sys_para.s_cmode == MOD_FREE) && (g_errshow == ERR_NONE))
+	if((g_st_SigData.m_Mode == MOD_FREE) && (g_st_SigData.m_errshow == ERR_NONE))
 	{
 		if(g_GuiData.g_mode)
 		{
@@ -668,18 +662,22 @@ void Key_ModLong(void)
 
 void Key_StartLong(void)
 {
-	if(g_sys_para.s_cmode == MOD_FREE)
-		g_sys_para.s_cmode = MOD_SIGACT;
-		
-		
+	if(g_st_SigData.m_Mode == MOD_FREE)
+	{
+		if(g_sys_para.s_mode == 0)  		//单打模式
+			g_st_SigData.m_Mode = MOD_SIGACT;
+		else
+			g_st_SigData.m_Mode = MOD_AUTOTAMP;
+	}
+
 	IOT_FUNC_ENTRY;
 }
 
 void Key_Start(void)
 {
-	if(g_sys_para.s_cmode != MOD_FREE)
+	if(g_st_SigData.m_Mode != MOD_FREE)
 	{
-		g_sys_para.s_cmode = MOD_FREE;
+		g_st_SigData.m_Mode = MOD_FREE;
 		G_SHACHE(ACT_ON,0);
 		G_LIHE(ACT_OFF,200);
 	}

@@ -51,5 +51,6 @@ enum SC
 void G_LIHE(uint32_t sta, uint32_t delay);
 void G_SHACHE(uint32_t sta, uint32_t delay);
 void G_ActPoll_10ms(void);
+void Lihe_Generate_PWM(void);
 #endif
 
