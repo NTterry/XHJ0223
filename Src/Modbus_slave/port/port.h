@@ -69,7 +69,7 @@ extern uint16_t ucRegCoilsBuf[REG_COILS_SIZE];
 
 //master read_write (0x03)  write sigle (0x06) write multi (0x10)   big fist
 #define REG_HOLDING_START 2000  		//���ּĴ�����ʼ��ַ
-#define REG_HOLDING_NREGS 50	    //���ּĴ�������
+#define REG_HOLDING_NREGS 40	    //���ּĴ�������
 extern uint16_t usRegHoldingBuf[REG_HOLDING_NREGS];
 
 /*master read_only coil (0x02)  litte first*/

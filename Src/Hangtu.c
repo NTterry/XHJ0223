@@ -80,6 +80,7 @@ void ModbusData_Init(void)
 	RecordIn(M_LIHE, g_sys_para.s_setlihecm);
 	RecordIn(M_HPROT, g_sys_para.s_hprot);
 	RecordIn(M_ACCRE,100);			/*授权码*/
+	RecordIn(M_MAXH,g_sys_para.s_maxhigh); /*最大打锤高度*/
 	
 	s_record.nub = 0;
 	s_record.deepth = 0;
@@ -98,6 +99,7 @@ void ModbusData_flash(void)
 	RecordIn(M_TICHUI,g_GuiData.g_sethighcm);
 	RecordIn(M_LIHE,g_GuiData.g_lihe);
 	RecordIn(M_HPROT,g_GuiData.g_HighOvercm);
+	RecordIn(M_MAXH,g_GuiData.g_Maxhigh); /*最大打锤高度*/
 }
 
 /*高度信息，深度信息显示到触摸屏上*/
@@ -169,7 +171,7 @@ void ModbusData_Chk(void)
 	/*设定提锤高度*/
 	if(usRegHoldingBuf[M_TICHUI] != g_GuiData.g_sethighcm)
 	{
-		if((usRegHoldingBuf[M_TICHUI] <= MAXSET_HIGH) && (usRegHoldingBuf[M_TICHUI] > MINSET_HIGH))
+		if((usRegHoldingBuf[M_TICHUI] <= g_sys_para.s_maxhigh) && (usRegHoldingBuf[M_TICHUI] > MINSET_HIGH))
 		{
 			g_GuiData.g_sethighcm = usRegHoldingBuf[M_TICHUI];
 			g_GuiData.g_HasChanged = 2;
@@ -204,6 +206,19 @@ void ModbusData_Chk(void)
 		else
 		{
 			usRegHoldingBuf[M_HPROT] = g_GuiData.g_HighOvercm;
+		}
+	}
+	/*设定最大打锤高度   add 2020.3.11*/
+	if(usRegHoldingBuf[M_MAXH] != g_GuiData.g_Maxhigh)
+	{
+		if(usRegHoldingBuf[M_MAXH] <= MAXSET_HIGH)
+		{
+			g_GuiData.g_Maxhigh = usRegHoldingBuf[M_MAXH];
+			g_GuiData.g_HasChanged = 2;
+		}
+		else
+		{
+			usRegHoldingBuf[M_MAXH] = g_GuiData.g_Maxhigh;
 		}
 	}
 	
@@ -259,19 +274,17 @@ void LedSta_Show(uint8_t ledsta)
   * @version v1.0
   * @note    最好放在操作系统的系统时钟回调函数中执行
   ***********************************************************/
-int liu_flg = 0;
-int sha_flg = 0;
+static int liu_flg = 0;      //自锁，让必要动作只执行1次
+static int sha_flg = 0;
 void EXT_BUTTON_CHK(void)
 {
 	static uint16_t b_Dd;
 	static uint8_t k_Cluch;
 	static uint8_t k_Brk;
-	static uint16_t b_Zd;
 	static uint16_t b_stop;
 	static uint8_t b_liu;
 	
 	b_Dd <<= 1;
-	b_Zd <<= 1;
 	k_Cluch <<= 1;
 	k_Brk <<= 1;
 	b_stop <<= 1;
@@ -279,8 +292,6 @@ void EXT_BUTTON_CHK(void)
 	
 	if(KEY_DD == GPIO_PIN_SET)
 		b_Dd |= 0x01;
-	if(KEY_ZD == GPIO_PIN_SET)
-		b_Zd |= 0x01;
 	if(KEY_TLH == GPIO_PIN_RESET)
 		k_Cluch |= 0x01;
 	if(KEY_TSC == GPIO_PIN_RESET)
@@ -311,69 +322,55 @@ void EXT_BUTTON_CHK(void)
 			g_st_SigData.m_Mode = MOD_MANOFF;
 	}
 	
-	if(b_Zd > 0x1FFF)   //增强抗干扰能力
-	{
-		IOT_FUNC_ENTRY;
-		if(g_st_SigData.m_Mode == MOD_FREE)
-		{
-			b_Zd = 0;
-			if(g_sys_para.s_mode == 0)
-				g_st_SigData.m_Mode = MOD_SIGACT;     /*进入自动打锤模式*/
-		}
-		else if(g_st_SigData.m_Mode != MOD_FREE)      /*这个按钮可能失灵了，会自动停机*/
-		{
-			b_Zd = 0;
-			g_st_SigData.m_Mode = MOD_FREE;
-		}
-	}
-	
 	if((k_Cluch == 0xFF) || (k_Brk == 0xFF)||(b_liu == 0xff))
 	{
 		if(g_st_SigData.m_Mode == MOD_FREE)
 		{
 			g_st_SigData.m_Mode = MOD_TST;
 		}
-		
-		if(k_Cluch == 0xFF)
-			G_LIHE(ACT_ON,0);
-		else
-			G_LIHE(ACT_OFF,0);
+		if(g_st_SigData.m_Mode == MOD_TST)   //只有进入测试模式下，才能手动操作，避免自动工作时误操作
+		{
+			if(k_Cluch == 0xFF)
+				G_LIHE(ACT_ON,0);
+			else
+				G_LIHE(ACT_OFF,0);
+				
+			if(k_Brk == 0xFF)
+			{
+				if(sha_flg <= 0)
+				{
+					G_SHACHE(ACT_OFF,0);
+					sha_flg = 1;
+					Log_e("ACT_OFF");
+				}
+			}
+			else
+			{
+				if(sha_flg)
+				{
+					sha_flg = 0;
+					G_SHACHE(ACT_ON,0);
+					Log_e("ACT_ON");
+				}
+			}
 			
-		if(k_Brk == 0xFF)
-		{
-			if(sha_flg <= 0)
+			if(b_liu == 0xff)
 			{
-				G_SHACHE(ACT_OFF,0);
-				sha_flg = 1;
-				Log_e("ACT_OFF");
+				if(liu_flg <= 0)
+				{
+					G_SHACHE(ACT_LIU,0);
+					liu_flg = 1;
+					Log_e("ACT_LIU");
+				}
 			}
-		}
-		else
-		{
-			if(sha_flg)
+			else
 			{
-				sha_flg = 0;
-				G_SHACHE(ACT_ON,0);
-				Log_e("ACT_ON");
-			}
-		}
-		
-		if(b_liu == 0xff)
-		{
-			if(liu_flg <= 0)
-			{
-				G_SHACHE(ACT_LIU,0);
-				liu_flg = 1;
-				Log_e("ACT_LIU");
-			}
-		}
-		else
-		{
-			if(liu_flg > 0)
-			{
-				liu_flg = 0;
-				G_SHACHE(ACT_ON,0);
-				Log_e("ACT_ON");
+				if(liu_flg > 0)
+				{
+					liu_flg = 0;
+					G_SHACHE(ACT_ON,0);
+					Log_e("ACT_ON");
+				}
 			}
 		}
 	}
@@ -428,6 +425,7 @@ int SingleAct(int mode)
 	case e_STEP_READY:
 		LED_BIT_SET(SIG_TICHUI);
 		LED_BIT_CLR(SIG_FANGCHUI);
+		LED_BIT_CLR(SIG_SHACHE);
 		if(mode)
 			s_SigActStep = e_STEP_PULL;
 		else
@@ -464,6 +462,7 @@ int SingleAct(int mode)
 			Sig_ResetSta();
 			LED_BIT_SET(SIG_TICHUI);
 			LED_BIT_CLR(SIG_FANGCHUI);
+			
 		}
 		break;
 	 default:ret = ERR_SIG_SOFT;s_SigActStep = e_STEP_READY;
@@ -538,7 +537,7 @@ SYS_STA ServicesLoop(void)
 		{
 		    int sig_err;
 			
-			sig_err = SingleAct(0);
+			sig_err = SingleAct(g_st_SigData.m_eibutton);
 			if(sig_err > ERR_SIG_REACHDW)
 			{
 				g_st_SigData.m_Mode = MOD_FREE;		// jump out
@@ -569,9 +568,11 @@ SYS_STA ServicesLoop(void)
 	extern int gLiheRatio;
 	gLiheRatio = LIHE_TINY;
 #endif
+		  G_LIHE(ACT_OFF,0);
 		  G_SHACHE(ACT_ON,0);
           C_DISCTR();									/* 履带机 取消 如果  Terry 2019.07.04*/
 		  LED_BIT_CLR(SIG_TICHUI);
+		  LED_BIT_SET(SIG_SHACHE);
 		  g_st_SigData.m_manualflg = 0;
 		  break;
 	  case MOD_MANUAL:										//手动模式
@@ -943,6 +944,11 @@ static SYS_STA hangtu(uint16_t * pst)
 				}
 				else
 				{
+					if((sig_err == ERR_SIG_REACHUP) && (s_hang.dachui_cnt == g_sys_para.s_rammcnt))
+					{
+						g_st_SigData.m_Lihenew = g_st_SigData.m_Lihenew - 12;   /*第一次打锤打松一点*/
+					}
+	
 				    if(s_SigActStep == e_STEP_PULL)
 						RecordIn(M_ACT,1);
 					else
@@ -1065,6 +1071,11 @@ static SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
 					speed_over -= 4;
 			}
 			
+			if(LPosCm < -3000)
+			{
+				ret = HAS_REACH_TIMOUT;     //最大允许溜放深度为30米
+			}
+			
             break;
         case 3:												/*结束*/
             break;
@@ -1128,7 +1139,7 @@ void sysattr_init(uint16_t flg)
     g_sys_para.s_rammcnt = 6;         				/*夯土次数 Terry 2019.5.21*/
 	g_sys_para.s_hprot = 150;						/*默认高度保护设置 Terry 2019.7.6*/
 	g_sys_para.s_pset = 0;							/*校验无效 Terry 2019.7.9*/
-	
+	g_sys_para.s_maxhigh = 500;
 	/*检查内存是否完整   2017.11.8  */
 	status = EE_DatasRead(DATA_ADDRESS,(uint8_t *)&ID, 4);
 	osDelay(5);

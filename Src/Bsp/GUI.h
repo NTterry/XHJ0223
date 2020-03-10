@@ -86,6 +86,7 @@ struct GUI_DATA
 	int32_t g_index;			/*数码管显示序号  */
 	int32_t g_show;				/*数码管待显示的数值*/
 	int32_t g_HighOvercm;		/*上拉超限保护值  Terry 2019.7.6*/
+	int32_t g_Maxhigh;
 	int8_t g_HasChanged;				/*数据是否更新标志*/
 	int8_t g_mode;				/*单打和双打的标志   改成自动夯土 和 单打模式 */
 	int16_t g_pset;				/*后台设置模式  Terry 2019.7.9*/

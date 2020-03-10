@@ -15,7 +15,7 @@ Date		:2015.06.01  - 2017.02.11
 
 #define CALUTICK				5					//40毫秒一次
 #define SHACHEDLY				(800)
-#define LIHEDLY         		(400)    /*0.4秒*/
+#define LIHEDLY         		(320)    /*0.3秒*/
 #define ERRDLY					500
 
 
@@ -130,6 +130,7 @@ __packed struct SYSATTR
 	int32_t s_rammcnt;                      /*夯土次数  3-10次 Terry 2019.5.21  */
 	uint32_t s_dir;						/*编码器方向标志信号*/
 	int32_t s_hprot;					/*高度保护设置 默认 300cm*/
+	int32_t s_maxhigh;					/*最大允许提锤高度*/
 	int16_t s_pset;						/*永久授权模式*/
 	uint8_t s_feedtims;					/*双打间隔时间，单位 0.1秒   改成 送料时间 Terry 2019.5.21  单位 秒  2-15秒*/
 	int8_t  s_mode;						/*0 单打  1 表示双打*/

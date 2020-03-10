@@ -11,6 +11,8 @@
 
 #define VERSION     20     					/*版本号 C97  2019.9.17*/
 
+#define MUNEDELAY   200						/*菜单自动回复延时 约 30秒*/
+
 extern struct SYSATTR g_sys_para;				/* 系统参数  */
 extern void W2Buff(void);
 extern void HT1632_Init(void);
@@ -28,6 +30,8 @@ volatile struct GUI_DATA	g_GuiData;
 static uint32_t s_ht1632_test = 0;				//测试模式
 static int8_t s_liheblink,s_highblink;  	/*离合闪烁标志  高度闪烁标志*/
 static uint32_t s_savecnt = 0;
+
+static int32_t s_menu_dly = 0;
 
 
 
@@ -99,6 +103,11 @@ void GuiDataUpdate(void)
 		g_sys_para.s_hprot = g_GuiData.g_HighOvercm;
 		s_savecnt = 20;
 	}
+	if(g_GuiData.g_Maxhigh != g_sys_para.s_maxhigh)
+	{
+		g_sys_para.s_maxhigh = g_GuiData.g_Maxhigh;
+		s_savecnt = 20;
+	}
 	/*立即保存*/
 	if(g_GuiData.g_index == SHOW_BACKSET)
 		s_savecnt = 10;
@@ -151,6 +160,15 @@ void Task_GUI_Function(void)
 		ModbusData_flash();
 		
 	ModbusData_Show();
+	
+	if(s_menu_dly > 0)				/*超时后，自动回到默认界面*/
+	{
+		s_menu_dly--;
+		if((s_menu_dly == 1) && (g_GuiData.g_index > SHOW_NONE))
+		{
+			g_GuiData.g_index = SHOW_NONE;
+		}
+	}
 	/*开始写入参数了*/
 	if(g_GuiData.g_HasChanged)
 	{
@@ -225,6 +243,7 @@ void GUI_Init(void)
 	g_GuiData.g_mode = g_sys_para.s_mode;
     g_GuiData.g_hcnt = g_sys_para.s_rammcnt;
 	g_GuiData.g_HighOvercm = g_sys_para.s_hprot;			/*Terry 2019.7.6*/
+	g_GuiData.g_Maxhigh = g_sys_para.s_maxhigh;      /*Terry add 2020.3.11*/
 	
 	HT1632_Init();
 	s_ht1632_test = 0;										//测试标志
@@ -331,11 +350,7 @@ int16_t get_errnum(uint32_t err)
 	else if(err & ERR_CT) ret = 15;
 	else if(err & ERR_HALT) ret = 16;
 	else if(err & ERR_ACE)  ret = 18; /*Terry add 2019.7.6*/
-	
-//	if(err)
-//	{
-//		Log_e("err %x,ret %d",err,ret);
-//	}
+
 	return ret;
 }
 
@@ -402,27 +417,27 @@ void CmdProc(void)
 void Key_HighUp(void)
 {
 	IOT_FUNC_ENTRY;
-	if(g_GuiData.g_sethighcm < MAXSET_HIGH)   /*最高12米  Terry  2019.5.21*/
+	if(g_GuiData.g_sethighcm < g_sys_para.s_maxhigh)   /*最高12米  Terry  2019.5.21*/
 	{
 		g_GuiData.g_sethighcm += PER_HIGH;
 		g_GuiData.g_HasChanged = 1;
 		s_highblink = HIGHSHOW;
 	}
-	if(g_GuiData.g_sethighcm > MAXSET_HIGH)
-		g_GuiData.g_sethighcm = MAXSET_HIGH;
+	if(g_GuiData.g_sethighcm > g_sys_para.s_maxhigh)
+		g_GuiData.g_sethighcm = g_sys_para.s_maxhigh;
 }
 
 void Key_HighUpL(void)
 {
 	IOT_FUNC_ENTRY;
-	if(g_GuiData.g_sethighcm < MAXSET_HIGH)   /*最高12米  Terry  2019.5.21*/
+	if(g_GuiData.g_sethighcm < g_sys_para.s_maxhigh)   /*最高12米  Terry  2019.5.21*/
 	{
 		g_GuiData.g_sethighcm += PER_HIGH * 10;
 		g_GuiData.g_HasChanged = 1;
 		s_highblink = HIGHSHOW * 2;
 	}
-	if(g_GuiData.g_sethighcm > MAXSET_HIGH)
-		g_GuiData.g_sethighcm = MAXSET_HIGH;
+	if(g_GuiData.g_sethighcm > g_sys_para.s_maxhigh)
+		g_GuiData.g_sethighcm = g_sys_para.s_maxhigh;
 }
 void Key_HighDw(void)
 {
@@ -527,6 +542,7 @@ void Key_LiheDwL(void)
 void Key_Set(void)
 {
 	IOT_FUNC_ENTRY;
+	s_menu_dly = MUNEDELAY;
 	if(g_st_SigData.m_errshow)
 		clear_err(&g_st_SigData.m_errshow);
 	else if(g_GuiData.g_index == SHOW_BACKSET)
@@ -546,6 +562,7 @@ void Key_Set(void)
 void Key_Add(void)
 {
 	IOT_FUNC_ENTRY;
+	s_menu_dly = MUNEDELAY;
 	if(g_st_SigData.m_errshow)
 		clear_err(&g_st_SigData.m_errshow);
 	else
@@ -590,6 +607,7 @@ void Key_Add(void)
 void Key_Sub(void)
 {
 	IOT_FUNC_ENTRY;
+	s_menu_dly = MUNEDELAY;
 	if(g_st_SigData.m_errshow)
 		clear_err(&g_st_SigData.m_errshow);
 	else
@@ -657,6 +675,7 @@ void Key_StartLong(void)
 {
 	if(g_st_SigData.m_Mode == MOD_FREE)
 	{
+		g_st_SigData.m_eibutton = 0;         //带学习的模式
 		if(g_sys_para.s_mode == 0)  		//单打模式
 			g_st_SigData.m_Mode = MOD_SIGACT;
 		else
@@ -677,45 +696,34 @@ void Key_Start(void)
 	IOT_FUNC_ENTRY;
 }
 
-
-
-
-
-
-
-
-void Key_TBrkLong(void)
+void Key_ZD_Long(void)
 {
-	IOT_FUNC_ENTRY;
-}
-void Key_TLhLong(void)
-{
-	IOT_FUNC_ENTRY;
-}
-void Key_Dd(void)
-{
-	IOT_FUNC_ENTRY;
-}
-void Key_Zd(void)
-{
-	IOT_FUNC_ENTRY;
-}
-void Key_Stop(void)
-{
-	IOT_FUNC_ENTRY;
-}
-void Key_Liu(void)
-{
-	IOT_FUNC_ENTRY;
+	if(g_st_SigData.m_Mode == MOD_FREE)
+	{
+		if(g_sys_para.s_mode == 0)
+			g_st_SigData.m_Mode = MOD_SIGACT;     /*进入自动打锤模式*/
+		else
+			g_st_SigData.m_Mode = MOD_AUTOTAMP;
+		
+		g_st_SigData.m_eibutton = 1;             /*不带学习的模式*/
+	}
 }
 
-
-
+void Key_ZD(void)
+{
+	if(g_st_SigData.m_Mode != MOD_FREE)      /*这个按钮可能失灵了，会自动停机*/
+	{
+		G_LIHE(ACT_OFF,100);
+		G_SHACHE(ACT_ON,0);
+		C_DISCTR();
+		g_st_SigData.m_Mode = MOD_FREE;
+		g_st_SigData.m_eibutton = 0;
+	}
+}
 
 #define GPIO_KEY_NUM 16 					///< Defines the total number of key member
 static keyTypedef_t DsingleKey[GPIO_KEY_NUM]; 	///< Defines a single key member array pointer
 keysTypedef_t keys;  
-
 
 void keyInit(void)
 {
@@ -730,15 +738,7 @@ void keyInit(void)
 
 	DsingleKey[8] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_8,  Key_Start,Key_StartLong );   //KEY_START
 	
-	
-//	DsingleKey[9] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_2,  0,   Key_TBrkLong );    //KEY_TSC
-//	DsingleKey[10] = keyInitOne(GPIO_PIN_RESET, GPIOB, GPIO_PIN_9,  0,   Key_TLhLong );    //KEY_TLH
-	
-//	DsingleKey[11] = keyInitOne(GPIO_PIN_SET, GPIOB, GPIO_PIN_14,  Key_Dd,   0 );   //KEY_DD
-//	DsingleKey[12] = keyInitOne(GPIO_PIN_SET, GPIOA, GPIO_PIN_3,  Key_Zd,   0 );    //KEY_ZD
-//	DsingleKey[13] = keyInitOne(GPIO_PIN_SET, GPIOB, GPIO_PIN_15,  Key_Liu,   0 );   //KEY_LIU
-//	DsingleKey[14] = keyInitOne(NULL, GPIOB, GPIO_PIN_13,  Key_Stop,   0 );   //KEY_STOP
-	
+	DsingleKey[9] = keyInitOne(GPIO_PIN_SET, GPIOA, GPIO_PIN_3,  Key_ZD,   Key_ZD_Long );    //自动按钮
 	
     keys.singleKey = (keyTypedef_t *)&DsingleKey;
     keyParaInit(&keys); 

@@ -48,6 +48,7 @@ struct SIG_ACT_DATA
 	int32_t  m_Lihenew;				/*更新后离合点的高度*/
 	int32_t  m_Ddeepcm;				/*当前最低的深度*/
 	int32_t  m_ghalt;
+	int32_t  m_eibutton;
 };
 
 
