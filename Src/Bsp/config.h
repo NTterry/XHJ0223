@@ -16,7 +16,7 @@ Date		:2017.07.7  - 2017.9.11
 #include "stdio.h"
 
 
-#define  	WCH_DOG		0			/*1 使能窗看门狗*/
+#define  	WCH_DOG		1			/*1 使能窗看门狗*/
 
 
 #define USE_LIHE_PWM
@@ -32,7 +32,7 @@ Date		:2017.07.7  - 2017.9.11
 
 
 
-//#define 	USE_MOBUS_SLAVE		  // Enable Modbus GUI
+#define 	USE_MOBUS_SLAVE		  // Enable Modbus GUI
 
 /*数码管显示驱动脚*/
 #define PIN_HCS		GPIO_PIN_3	

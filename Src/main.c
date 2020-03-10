@@ -53,7 +53,7 @@
 
 extern struct SIG_ACT_DATA g_st_SigData;
 /* USER CODE BEGIN Includes */
-uint16_t g_led_sta;
+uint16_t g_led_sta;   				/*Led 指示灯数据*/
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -125,7 +125,7 @@ int main(void)
   MX_USART3_UART_Init();			//刹车板通信
   
   MX_I2C2_Init();
-  HwEcInit();
+  HwEcInit();						//编码器引脚初始化
   /* Call init function for freertos objects (in freertos.c) */
   MX_FREERTOS_Init();
 
@@ -216,10 +216,10 @@ void StartDefaultTask(void const * argument)
         
 		/*指示灯 的显示 */
 	  	(g_st_SigData.m_Power > 5)? (LED_BIT_SET(SIG_CUR)): (LED_BIT_CLR(SIG_CUR));
-		Dsp_BarLight(g_led_sta,0);  	/*LED 指示显示*/
+		 Dsp_BarLight(g_led_sta,0);  	/*LED 指示显示*/
 		
 #if (WCH_DOG == 1)
-		if(i % 49 == 1)
+		if(i % 39 == 1)
 			HAL_IWDG_Refresh(&hiwdg);		
 #endif	
   }
@@ -229,7 +229,15 @@ void StartDefaultTask(void const * argument)
 
 
 
-/*速度 和 加速度数据的发送 */
+/************************************************************
+  * @brief   向刹车板发送速度和加速度指令
+  * @param   none
+  * @return  none
+  * @author  Terry
+  * @date    2020.2.16
+  * @version v1.0
+  * @note    定时0.2秒发送一次
+  ***********************************************************/
 extern struct Locationcm user_encoder;  
 void Speed_Send(void)
 {
@@ -239,7 +247,7 @@ void Speed_Send(void)
     int16_t ace;
 	int32_t tmp,acce;
 	
-	tmp = GetEncoderSpeedCm();			/*发送速度的绝对值  2019.12.08*/
+	tmp = g_st_SigData.m_SpeedCm;			/*发送速度的绝对值  2019.12.08*/
 	
 	if(tmp < 0)
 		tmp = -tmp;						/*不应该小于0   取反 2019.8.2*/
@@ -252,7 +260,6 @@ void Speed_Send(void)
 	/*加速度改成向下为正*/
 
 	acce = GetEncoderAcceCm();    	/*与原速度方向相反,下降的加速度为正*/
-
 
 	if(acce > 1000)
 		acce = 1000;
@@ -270,9 +277,6 @@ void Speed_Send(void)
     sbuff[5] = sbuff[0] + sbuff[1] + sbuff[2] + sbuff[3] + sbuff[4];
     
     HAL_UART_Transmit(&huart3, (uint8_t *)&sbuff, 6, 20);
-	tmp = Enc_Get_CNT1();
-	acce = Enc_Get_Acce();
-//	Log_e("C%d,acc %d",tmp,acce);
 }
 
 

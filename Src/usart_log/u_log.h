@@ -22,7 +22,7 @@ extern "C" {
 
 #include "string.h"
 
-#define IOT_DEBUG
+//#define IOT_DEBUG
 
 #define _IN_            /* indicate an input parameter */
 #define _OU_            /* indicate a output parameter */

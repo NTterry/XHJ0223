@@ -37,15 +37,17 @@ enum ACT_SINGLE_DW
 
 struct SIG_ACT_DATA
 {
-	int32_t m_HeightShowCm;
-	int32_t m_HeighRammCm;			/*夯土时，锤的计量高度*/
-	int32_t m_SpeedCm;
-	int32_t m_Power;
-	int32_t m_Mode;
-	int32_t m_errnum;				/*错误编号*/
-	int32_t m_manualflg;
+	int32_t  m_HeightShowCm;
+	int32_t  m_HeighRammCm;			/*夯土时，锤的计量高度*/
+	int32_t  m_SpeedCm;
+	int32_t  m_Power;
+	int32_t  m_Mode;
+	int32_t  m_errnum;				/*错误编号*/
+	int32_t  m_manualflg;
 	uint32_t m_errshow;				/*主执行程序的错误返回码*/
 	int32_t  m_Lihenew;				/*更新后离合点的高度*/
+	int32_t  m_Ddeepcm;				/*当前最低的深度*/
+	int32_t  m_ghalt;
 };
 
 

@@ -28,9 +28,9 @@ typedef struct
 
 typedef struct
 {
-	FRQ_TIM pre_tim;
-	FRQ_TIM last_tim;
-	uint32_t longtime;
+	FRQ_TIM pre_tim;				//上一次的捕获时间
+	FRQ_TIM last_tim;				//本次捕获时间
+	uint32_t longtime;				//间隔时间
 	uint32_t time_high;
 }FRQ_MENS;
 

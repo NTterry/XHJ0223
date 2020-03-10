@@ -15,7 +15,7 @@ Date		:2015.06.01  - 2017.02.11
 
 #define CALUTICK				5					//40∫¡√Î“ª¥Œ
 #define SHACHEDLY				(800)
-#define LIHEDLY         		(4 * 110)    /*0.4√Î*/
+#define LIHEDLY         		(400)    /*0.4√Î*/
 #define ERRDLY					500
 
 
@@ -181,13 +181,6 @@ typedef __packed struct SPEED
     int16_t readyflg;
 }SSPEED;
 
-
-#define HALT_BREAK	{			\
-						if(g_halt)	\
-						{status |= ERR_HALT; break;}  \
-                        if(g_st_SigData.m_Mode == MOD_FREE)\
-                            break;\
-					}
 
 #define ERR_BREAK   if(status)  break
 

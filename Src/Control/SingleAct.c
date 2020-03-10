@@ -53,7 +53,7 @@ static ERR_SIG BreakOff_Check(int power,int speedcm)
 	switch(Sta_Break)
 	{
 		case 0:
-			if(speedcm < -VALID_MIN_CM)
+			if(speedcm < -VALID_MIN_CM)   /*发生下溜了*/
 			{
 				Sta_Break  = 1;
 			}
@@ -62,7 +62,7 @@ static ERR_SIG BreakOff_Check(int power,int speedcm)
 		case 1:
 			if(speedcm < 0)
 			{
-				if(CHECK_TIMEOUT(2000))
+				if(CHECK_TIMEOUT(1200))  //持续 1.2 秒
 				{
 					if(power > Per2Power(VALID_POWM))
 						ret = ERR_SIG_PULLUP;
@@ -79,7 +79,11 @@ static ERR_SIG BreakOff_Check(int power,int speedcm)
 	return ret;
 }
 
-/*堵转检测*/
+/*堵转检测
+正常时返回 0
+一般卡锤  返回1
+严重卡锤  返回2
+*/
 static int Stuck_Ckeck(int power,int speedcm)
 {
 	DEF_TIMEOUT;
@@ -87,41 +91,40 @@ static int Stuck_Ckeck(int power,int speedcm)
 	switch(Sta_Stuck)
 	{
 		case 0:
-			if(power > Per2Power(160) && ((speedcm) > VALID_MIN_CM))
-			{
-				Sta_Stuck = 1;
-				SET_TIME;
-			}
-			else if(power > Per2Power(180))
+		    if(power > Per2Power(200))
 			{
 				Sta_Stuck = 2;
 				SET_TIME;
 			}
+			else if(power > Per2Power(VALID_POWOVER) && ((speedcm) > VALID_MIN_CM))
+			{
+				Sta_Stuck = 1;
+				SET_TIME;
+			}
 			break;
-		case 1:
-			if(power < Per2Power(150))
+		case 1:                  
+			if(power < Per2Power(130))
 			{
 				Sta_Stuck = 0;
 			}
 			if(CHECK_TIMEOUT(2000))
 			{
 				Sta_Stuck = 0;		// error
-				ret = 1;
+				ret = 1;            //卡锤了
 			}
 			break;
 		case 2:
-			if(power < Per2Power(150) && ((speedcm) > VALID_MIN_CM))
+			if(power < Per2Power(130) && ((speedcm) > VALID_MIN_CM))
 			{
 				Sta_Stuck = 0;
 			}
-			if(CHECK_TIMEOUT(1000))
+			if(CHECK_TIMEOUT(1000))   /*严重卡锤了*/
 			{
 				Sta_Stuck = 0;  	// error
 				ret = 2;
 			}
 			break;
-		default:
-			
+		default:Sta_Stuck = 0;
 			break;
 	}
 	return ret;
@@ -143,6 +146,16 @@ void Sig_ResetSta(void)
 	Sta_SigLandDw = DIG_IDLE;
 }
 
+int PullUpTimeMax(void)
+{
+	int tim;
+	
+	tim = g_sys_para.s_sethighcm * 20;    //预设提锤速度0.5米/秒，要小于实际速度
+	tim += 2000;						  //预留两秒超时时间
+	
+	return tim;
+}
+
 
 /************************************************************
   * @brief   正常模式的提锤
@@ -153,7 +166,6 @@ void Sig_ResetSta(void)
   * @version v1.0
   * @note    故障判断，超时时间由提锤高度确定
   ***********************************************************/
-  extern struct RECORD s_record;	
 ERR_SIG Sig_TakeUp(void)
 {
 	DEF_TIMEOUT;
@@ -170,23 +182,27 @@ ERR_SIG Sig_TakeUp(void)
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
 		case SIG_PULL_CLUTCH:
-			G_LIHE(ACT_ON,0); G_SHACHE(ACT_OFF,BRAKE_DLY400);
+			G_LIHE(ACT_ON,0); 										/*先直接小力拉离合*/
+			G_SHACHE(ACT_OFF,BRAKE_DLY400);
 			
 #ifdef USE_LIHE_PWM
-			gLiheRatio = LIHE_TINY;							/*先给小力  */
+			gLiheRatio = LIHE_TINY;	
 #endif
+			SET_TIME; 
+			LPrint("Pull \r\n");
 			Sta_SigTakeUp = SIG_PULL_HOLD;
-			SET_TIME; LPrint("Pull \r\n");
 			break;
 		
 		case SIG_PULL_HOLD:
-			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)
+			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)   			/*检测到开始正转提锤了*/
 			{
-				Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 				Log_e("Pos %d sp %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
+				g_st_SigData.m_Ddeepcm = g_st_SigData.m_HeighRammCm;                          //最大深度
+				Enc_Clr_TotalCnt1();
 				StartTim = SET_TIME;
+				Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 			}
-			if(CHECK_TIMEOUT(5000) || (g_st_SigData.m_HeightShowCm < -300))
+			if(CHECK_TIMEOUT(5000) || (g_st_SigData.m_HeightShowCm < -300))  /*超时检测,和下降异常检测，松3米认为异常*/
 			{
 				if(g_st_SigData.m_Power < Per2Power(VALID_POWL))
 					err_sta = ERR_SIG_CUR;
@@ -197,35 +213,41 @@ ERR_SIG Sig_TakeUp(void)
 			}
 			break;
 			
-		case SIG_WAIT_VALID_UP:
-			if((g_st_SigData.m_SpeedCm > VALID_MIN_CM) && (g_st_SigData.m_Power > Per2Power(VALID_POWH)))
+		case SIG_WAIT_VALID_UP:      /*速度向上，且拉力变小，持续0.2秒，可以清零*/
+			if((g_st_SigData.m_SpeedCm > VALID_MIN_CM) && (g_st_SigData.m_Power > Per2Power(VALID_POWH)) &&\
+				                               (g_st_SigData.m_HeightShowCm > 50))		/*超过50公分后，取消清零*/
 			{
-				
-				if(ClrNullCnt++ > 5)
-				{
-#ifdef USE_LIHE_PWM
-						gLiheRatio = LIHE_BIG;
-						Log_e("大力");
-#endif
-					Sta_Stuck = 0;		/*下一环节的判断状态清零*/
-					Sta_Break = 0;
-					Sta_SigTakeUp = SIG_WORKUP;
-					Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
-					Enc_Clr_TotalCnt1();
-					s_record.deepth = g_st_SigData.m_HeighRammCm;
-					StartTim = SET_TIME;
-				}
+				Sta_Stuck = 0;		/* 下一环节的判断状态清零 */
+				Sta_Break = 0;		/* 超溜检测 */
+				Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
+				StartTim = SET_TIME;
+				Sta_SigTakeUp = SIG_WORKUP;
 			}
-			if(g_st_SigData.m_Power < Per2Power(VALID_POWM))
+#ifdef USE_LIHE_PWM
+			if(g_st_SigData.m_Power > Per2Power(VALID_POWM))   //检测到有效拉力后，改为大力
 			{
-				ClrNullCnt = 0;
-				if(CHECK_TIMEOUT(20))
+				gLiheRatio = LIHE_BIG;
+				Log_e("大力");	
+			}
+#endif	
+			/*允许清零    拉力较小 而且速度大于0时，可以给编码器清零*/
+			if(g_st_SigData.m_Power < Per2Power(VALID_POWM) && (g_st_SigData.m_SpeedCm > VALID_MIN_CM))
+			{
+				ClrNullCnt++;
+				if(ClrNullCnt > (120 / HANG_TICK))                          //连续检测到小力 持续0.12秒
 				{
 					Enc_Clr_TotalCnt1();
+					g_st_SigData.m_Ddeepcm = g_st_SigData.m_HeighRammCm;    //最大深度
+					ClrNullCnt = 0;
 					SET_TIME;
 				}
 			}
-			if(((LAST_TIME - StartTim) > 5000) || (g_st_SigData.m_HeightShowCm < -300))	   // need add pull
+			else
+			{
+				ClrNullCnt = 0;
+			}
+			/*等待时间过长，判定为异常故障*/
+			if(((LAST_TIME - StartTim) > 4000) || (g_st_SigData.m_HeightShowCm < -300))	   // need add pull
 			{
 				if(g_st_SigData.m_Power < Per2Power(VALID_POWM))
 					err_sta = ERR_SIG_CUR;
@@ -254,17 +276,17 @@ ERR_SIG Sig_TakeUp(void)
 			else
 			{
 #ifdef USE_LIHE_PWM
-				if(g_st_SigData.m_HeightShowCm > 100)
+				if(g_st_SigData.m_HeightShowCm > 100)    //提锤超过1米，改为小力
 				{
-					gLiheRatio = LIHE_TINY;			//小力
+					gLiheRatio = LIHE_TINY;
 				}
 #endif
-				err_sta = BreakOff_Check(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm);
+				err_sta = BreakOff_Check(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm);  //提锤发生下溜时的状态检测
 				if(err_sta > ERR_SIG_REACHUP)
 					Log_e("%d",err_sta);
 			}
 			
-			if(Stuck_Ckeck(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm))  // if Blocked
+			if(Stuck_Ckeck(g_st_SigData.m_Power,g_st_SigData.m_SpeedCm))     // if Blocked
 			{
 				Sta_SigTakeUp = SIG_BLOCKED;
 				Log_e("Blocked");
@@ -273,18 +295,15 @@ ERR_SIG Sig_TakeUp(void)
 				SET_TIME;
 			}
 			
-			if(LAST_TIME > StartTim + StuckCnt * 700 + g_sys_para.s_sethighcm * 30 + 3000)   // if Timeout
+			if(LAST_TIME > (StartTim + PullUpTimeMax()))   // if Timeout
 			{
 				err_sta = ERR_SIG_TIMOUT;
 				Log_e("ERR_SIG_TIMOUT");
 			}
 			break;
 		
-		case SIG_REACH_TOP:
+		case SIG_REACH_TOP:							/*成功提锤到顶*/
 			err_sta = ERR_SIG_REACHUP;
-#ifdef USE_LIHE_PWM
-			gLiheRatio = LIHE_TINY;
-#endif
 			break;
 		
 		case SIG_BLOCKED:
@@ -308,12 +327,8 @@ ERR_SIG Sig_TakeUp(void)
 		
 		default:break;
 	}
-	if(err_sta > ERR_SIG_REACHUP)
-	{
-		IOT_FUNC_EXIT_RC(err_sta);
-	}
-	else
-		return err_sta;
+
+	return err_sta;
 }
 
 /************************************************************
@@ -330,44 +345,49 @@ ERR_SIG Sig_StudyUp(void)
 {
 	DEF_TIMEOUT;
 	ERR_SIG err_sta = ERR_SIG_OK;
-	static int dir_sure = 0,dir_cnt = 0;
+	static int dir_sure = 0,dir_chk_cnt = 0;
+	static int spnull;
+	int maxtim;
 	
 	switch(Sta_SigTakeUp)
 	{
 		case SIG_IDLE:
-			g_sys_para.s_pnull = g_st_SigData.m_Power;   //当前的功率为空载功率
-			Enc_Clr_TotalCnt1();
-			
+			spnull = g_st_SigData.m_Power;   				//当前的功率为空载功率	
 #ifdef USE_LIHE_PWM
-			gLiheRatio = LIHE_BIG;
+			gLiheRatio = LIHE_BIG;						 	//直接准备使用大力拉离合
 #endif
-			dir_cnt = 0;dir_sure = 0;
+			dir_chk_cnt = 0;dir_sure = 0;
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
 		
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0);
 			G_SHACHE(ACT_OFF,400);
+			Enc_Clr_TotalCnt1();	
 			Log_e("Pos %d sp %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 			SET_TIME;
 			Sta_SigTakeUp = SIG_PULL_HOLD;
 		break;
 		
 		case SIG_PULL_HOLD:
-			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)    //检测到速度有效
+			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)    	//检测到速度有效
 			{
 				dir_sure++;
-				if(dir_sure > 40)
+				if(dir_sure > 300/HANG_TICK)     //连续方向检测确认  0.3秒
 				{
 					Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 				}
 				if(dir_sure == 3)
 				{
 					Log_e("upPos %d",g_st_SigData.m_HeightShowCm);
-				}
-					
+				}					
 				SET_TIME;
 			}
+			else
+			{
+				dir_sure = 0;
+			}
+			
 			if(CHECK_TIMEOUT(1000))
 			{
 				SET_TIME;
@@ -381,8 +401,9 @@ ERR_SIG Sig_StudyUp(void)
 					Enc_Set_Dir(g_sys_para.s_dir);
 				}
 				
-				dir_cnt++;
-				if(dir_cnt > 4)
+				dir_chk_cnt++;
+				dir_sure = 0;
+				if(dir_chk_cnt > 3)
 				{
 					err_sta = ERR_SIG_ENCODER;
 				}	
@@ -394,20 +415,33 @@ ERR_SIG Sig_StudyUp(void)
 			{
 				if(g_st_SigData.m_HeightShowCm > g_sys_para.s_sethighcm / 2)
 				{
-					g_sys_para.s_pfull = g_st_SigData.m_Power; // 超过设定一半时，保存有效拉力值
-					g_st_SigData.m_Lihenew = g_sys_para.s_setlihecm;
-					Sta_SigTakeUp = SIG_WORKUP;
+					if(g_st_SigData.m_Power > spnull + 800)
+					{
+						g_sys_para.s_pnull  = spnull;			          //更新空载拉力
+						g_sys_para.s_pfull = g_st_SigData.m_Power;        // 超过设定一半时，保存有效拉力值
+						g_st_SigData.m_Lihenew = g_sys_para.s_setlihecm + 5;  //更新离合点高度
+						Sta_SigTakeUp = SIG_WORKUP;
+					}
+					else
+					{
+						err_sta = ERR_SIG_CUR;
+						Log_e("Study Error");
+					}
 				}
 				SET_TIME;
 			}
-			if(CHECK_TIMEOUT(2000))	   // need add pull
+			/*超时检测*/
 			{
-				if(g_st_SigData.m_SpeedCm < VALID_MIN_CM)
-					err_sta = ERR_SIG_ENCODER;
-				else
-					err_sta = ERR_SIG_PULLUP;
-					
-				Log_e("%d",g_st_SigData.m_SpeedCm);
+				maxtim = PullUpTimeMax() / 2;
+				if(CHECK_TIMEOUT(maxtim))	   // need add pull
+				{
+					if(g_st_SigData.m_SpeedCm < VALID_MIN_CM)
+						err_sta = ERR_SIG_ENCODER;
+					else
+						err_sta = ERR_SIG_PULLUP;
+						
+					Log_e("%d",g_st_SigData.m_SpeedCm);
+				}
 			}
 		break;
 			
@@ -416,12 +450,8 @@ ERR_SIG Sig_StudyUp(void)
 			{
 				Sta_SigTakeUp = SIG_REACH_TOP;
 			}
-			if(g_sys_para.s_pfull < g_sys_para.s_pnull + 1000)
-			{
-				err_sta = ERR_SIG_CUR;
-				Log_e("f%d  n%d",g_sys_para.s_pfull,g_sys_para.s_pnull);
-			}
-			if(CHECK_TIMEOUT(5000))
+			maxtim = PullUpTimeMax() / 2;	     			/*继续上拉1/2的高度的超时保护*/
+			if(CHECK_TIMEOUT(maxtim))
 			{
 				err_sta = ERR_SIG_TIMOUT;
 				Log_e("Time out");

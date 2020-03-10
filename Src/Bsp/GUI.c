@@ -9,7 +9,7 @@
 #include "keyboard.h"
 #include "SingleAct.h"
 
-#define VERSION     19     					/*版本号 C97  2019.9.17*/
+#define VERSION     20     					/*版本号 C97  2019.9.17*/
 
 extern struct SYSATTR g_sys_para;				/* 系统参数  */
 extern void W2Buff(void);
@@ -181,13 +181,6 @@ void Task_GUI_Function(void)
 	
 	show_brush();
 	savedatas();
-	/*无错误且急停未按下时，急停OK不断开*/
-	if((g_st_SigData.m_errshow) || g_halt)
-	{
-		C_STOP();
-	}
-	else
-		C_OK();
 }
 
 extern volatile uint8_t sys_fbsta;	
@@ -205,7 +198,7 @@ void savedatas(void)
 			g_sys_para.s_dir = 1;
 //		if((sys_fbsta & FB_24VOK))
 //		{
-			EE_DatasWrite(DATA_ADDRESS,(uint8_t *)&g_sys_para,sizeof(g_sys_para));
+		EE_DatasWrite(DATA_ADDRESS,(uint8_t *)&g_sys_para,sizeof(g_sys_para));
 //			if((status == HAL_OK) && (s_ht1632_test))
 //		}
 		s_savecnt = 72000;		// 2H后再自动保存数据
@@ -290,14 +283,14 @@ void GUI_showdata(void)
 		if(tmp < 10)
 		{
 			Dsp_Num(tmp,0,LEDCODE[19]);  // P与E
-//			BUZZER(1);
+			BUZZER(1);
 		}
 		else
 		{
 			if(tmp != 16)
 			{
 				Dsp_Num(tmp,0,LEDCODE[20]);
-//				BUZZER(1);							//急停
+				BUZZER(1);							//急停
 			}
 			else
 			{

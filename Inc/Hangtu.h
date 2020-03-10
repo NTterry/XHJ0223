@@ -35,6 +35,7 @@ SYS_STA ServicesLoop(void);
 #define M_HIGH2		21	  
 #define M_CNT2		22
 
+extern  uint16_t g_led_sta;
 #define LED_BIT_SET(x)		g_led_sta |= x
 #define LED_BIT_CLR(x)		g_led_sta &= ~x
 

@@ -12,19 +12,17 @@
 #define DELAYMS(x)	   osDelay(x)
 
 #define HAS_REACH_DOWN		1
+#define HAS_REACH_TIMOUT	2
+#define HAS_REACH_SPOVER	3
 
 #define STA_CLEAR(x)        x = 0
 
-extern struct SIG_ACT_DATA g_st_SigData;
-extern volatile struct GUI_DATA	g_GuiData;
+extern struct SIG_ACT_DATA g_st_SigData;			/*实时数据*/
+extern volatile struct GUI_DATA	g_GuiData;			/*显示和临时数据*/
 
 static SYS_STA LiuChkDw(int LPosCm,int LSpeedCm);
 static SYS_STA Check_up(int LPosCm);
 static SYS_STA hangtu(uint16_t * pst);
-
-
-volatile uint32_t g_halt = 0;
-
 
 /*夯土整个工艺流程  */
 /*
@@ -34,13 +32,14 @@ volatile uint32_t g_halt = 0;
 struct HANGTU s_hang;                                   /*夯土流程状态检测*/
 struct RECORD s_record;									/*待上传的数据*/
 struct SYSATTR g_sys_para;								// 系统参数
-extern uint16_t g_led_sta;
+
 
 /*紧急停机处理*/
-void Halt_Stop(void)
+void Halt_Stop(uint32_t delay)
 {
 	G_LIHE(ACT_OFF,0);
 	G_SHACHE(ACT_ON,0);
+	C_DISCTR();
 }
 
 /*计算当前的时间间隔*/
@@ -293,11 +292,11 @@ void EXT_BUTTON_CHK(void)
 		
 	if(b_stop > 0xFFF)
 	{
-		g_halt = 0;
+		g_st_SigData.m_ghalt = 0;
 	}
 	else
 	{
-		g_halt = 1;
+		g_st_SigData.m_ghalt = 1;
 	}
 		
 	if(b_Dd > 0xFFF)
@@ -395,15 +394,14 @@ static enum {
 	e_STEP_STUDY,
 	e_STEP_PULL,
 	e_STEP_DOWN,
-}s_SigActStep;
+}s_SigActStep;         		/*整个打桩循环的过程状态*/
 
-
-uint16_t TampStep;
+static uint16_t TampStep;   /*整个夯土过程的循环状态*/
 
 #define SIGACT_READY    s_SigActStep = e_STEP_READY
 #define TAMP_READY		TampStep = S_IDLE;
 
-extern void SetSaveFlag(void);
+extern void SetSaveFlag(void);   //学习完成后的数据保存
 
 
 /************************************************************
@@ -418,7 +416,7 @@ extern void SetSaveFlag(void);
              提锤到顶返回 ERR_SIG_REACHUP
 			 打锤结束返回 ERR_SIG_REACHDW
 			 正常工作返回 ERR_SIG_OK
-			 其余为错误模式
+			 其余为错误模式，外部错误检测
 			 函数非重入
   ***********************************************************/
 int SingleAct(int mode)
@@ -460,7 +458,7 @@ int SingleAct(int mode)
 		break;
 	case e_STEP_DOWN:
 		ret = Sig_LandDw();
-		if(ret == ERR_SIG_REACHDW)
+		if(ret == ERR_SIG_REACHDW)   //返回状态位到底，即需要立即跳转
 		{
 			s_SigActStep = e_STEP_PULL;
 			Sig_ResetSta();
@@ -472,11 +470,28 @@ int SingleAct(int mode)
 	    Log_e("ERR_SIG_SOFT");
 	    break;
 	}
-	
 	return ret;
 }
   
 
+static SYS_STA ErrChg(int sigerr)
+{
+	SYS_STA sret = ERR_NONE;
+	
+	switch(sigerr)
+	{
+		case ERR_SIG_PULLUP :sret|= ERR_LS;break;
+		case ERR_SIG_ENCODER:sret|= ERR_TT;break;
+		case ERR_SIG_CUR    :sret|= ERR_CT;break;
+		case ERR_SIG_CLING  :sret|= ERR_NC;break;
+		case ERR_SIG_BRAKE  :sret|= ERR_KC;break;
+		case ERR_SIG_TIMOUT :sret|= ERR_CS;break;
+		default:sret|= ERR_CHAO;
+			break;
+	}
+	
+	return sret;
+}
 
 
 /************************************************************
@@ -495,11 +510,24 @@ SYS_STA ServicesLoop(void)
 	
 	EXT_BUTTON_CHK();
 	
-	GetLiveData();						/*得到 拉力位置 和 速度的动态信息，用于后面的计算*/
+	GetLiveData();						 /*得到 拉力位置 和 速度的动态信息，用于后面的计算*/
 	
-	if(g_st_SigData.m_errnum > 0)       /*Err Check  使用 m_errshow  和 m_errnum实现故障自锁，所以此处跳出*/
+	if(g_st_SigData.m_errshow > 0)       /*Err Check  使用 m_errshow  和 m_errnum实现故障自锁，所以此处跳出*/
 	{
-		Halt_Stop();
+		C_STOP();
+		g_st_SigData.m_Mode = MOD_FREE;
+		if(g_st_SigData.m_errshow == ERR_HALT)
+		{
+			if(g_st_SigData.m_ghalt == 0)
+				g_st_SigData.m_errshow = ERR_NONE;   //急停状态不保存
+		}
+		return 0;
+	}
+	C_OK();
+	if(g_st_SigData.m_ghalt)
+	{
+		Halt_Stop(0);
+		g_st_SigData.m_errshow = ERR_HALT; 
 		g_st_SigData.m_Mode = MOD_FREE;
 		return 0;
 	}
@@ -508,30 +536,31 @@ SYS_STA ServicesLoop(void)
 	{
 		case MOD_SIGACT:     		//自动打锤模式 
 		{
-		    ERR_SIG sig_err;
+		    int sig_err;
 			
 			sig_err = SingleAct(0);
-			if((sig_err > ERR_SIG_REACHDW) || g_halt)
+			if(sig_err > ERR_SIG_REACHDW)
 			{
-				Halt_Stop();
-				Log_e("Halt stop");
 				g_st_SigData.m_Mode = MOD_FREE;		// jump out
-				switch(sig_err)
-				{
-					case ERR_SIG_PULLUP :ret|= ERR_LS;break;
-					case ERR_SIG_ENCODER:ret|= ERR_TT;break;
-					case ERR_SIG_CUR    :ret|= ERR_CT;break;
-					case ERR_SIG_CLING  :ret|= ERR_NC;break;
-					case ERR_SIG_BRAKE  :ret|= ERR_KC;break;
-					case ERR_SIG_TIMOUT :ret|= ERR_CS;break;
-					default:break;
-				}
+				
+				ret |= ErrChg(sig_err);
+				
+			}
+			if(g_st_SigData.m_ghalt)
+			{
+				ret |= ERR_HALT;
+				g_st_SigData.m_Mode = MOD_FREE;
 			}
 		    break;	
          }			
 	  case MOD_AUTOTAMP:								// 全自动夯土模式
 			ret = hangtu(&TampStep);        			/*轮询无堵塞*/
 			LedSta_Show(TampStep);						/*Led状态显示*/
+			if(g_st_SigData.m_ghalt)					/*发生异常，立即停车*/
+			{
+				ret |= ERR_HALT;
+				g_st_SigData.m_Mode = MOD_FREE;
+			}
 		  break;	
 	  case MOD_FREE:
 		  TAMP_READY;
@@ -571,24 +600,31 @@ SYS_STA ServicesLoop(void)
 			break;																																			//Terry add 2017.11.16
 	  default:	
 			g_st_SigData.m_Mode = MOD_FREE;
-			Halt_Stop();
+			Halt_Stop(100);
 		  break;
 	}
 
 	if(g_st_SigData.m_Mode > MOD_DOWN)
 		g_st_SigData.m_Mode = MOD_FREE;
 		
+
+		
 	if(ret > ERR_NONE)	
+	{
 		g_st_SigData.m_errshow = ret; 
+		Halt_Stop(100);
+	}
 
   return ret;
 }
 
-/*检查锤是否停止，延时2秒确认*/
 /************************************************************
   * @brief   提锤到顶后，检查锤子是否定住，此时速度应该 -20 - 20
-  * @param   none
-  * @return  none
+  * @param   pos: 当前锤的位置
+  *          speed: 当前深度
+  * @return  1 :正常定住
+  *          2：冲顶保护
+  *          3: 超时
   * @author  Terry
   * @date    2020.2.16
   * @version v1.0
@@ -612,19 +648,20 @@ static int Check_Stop(int pos,int speed)
 			power_H = Per2Power(160);
 			break;
 		case 1:
-			/******************** 溜放停机检测   ****************/
+			/******************** 提锤停机检测   ****************/
 			if((speed < 20) && ((speed > -20)) && (g_st_SigData.m_Power < power_L))
+			{
 				stop_cnt++;
+				if(stop_cnt > 500/HANG_TICK)
+				{
+					s_hang.stop_sta = 2;			/*成功定住*/
+				}
+			}
 			else
 			{
 				if(stop_cnt > 3)
 					stop_cnt -= 3;
 			}
-			if(stop_cnt > 600/HANG_TICK)
-			{
-				s_hang.stop_sta = 2;			/*成功定住*/
-			}
-			
 			/**********************卡锤检测***********************/
 			if(g_st_SigData.m_Power > power_H)
 			{
@@ -747,7 +784,6 @@ static SYS_STA hangtu(uint16_t * pst)
 				Enc_Clr_TotalCnt2();					/*得到顶端的高度  0*/
                 s_hang.overpow = 0;
                 s_hang.speederr = 0;
-				
 				G_SHACHE(ACT_LIU,0); 
 				
 				s_hang.last_highnum = g_st_SigData.m_HeighRammCm;		/*溜放时的高度  Terry 2019.11.12 只用于判断下降高度*/
@@ -757,7 +793,7 @@ static SYS_STA hangtu(uint16_t * pst)
             }
             break;
         case S_PULSE:
-                *pst = S_TICHUI; 
+                
                 s_hang.top_sta = 0;
                 G_LIHE(ACT_ON,0);
                 G_SHACHE(ACT_OFF,SHACHEDLY);    /*开始提锤*/
@@ -767,26 +803,28 @@ static SYS_STA hangtu(uint16_t * pst)
 				s_hang.lowpow = 0;
 				//更新和发送记录
 				s_record.nub++;
+				RecordIn(M_ACT,1);
 				RecordIn(M_NUB,s_record.nub);
 				RecordIn(M_TIMES,s_record.cnt);
 				RecordIn(M_THIGH,s_record.high);
 				RecordIn(M_SONGTU,s_record.tim);
+				*pst = S_TICHUI; 
             break;
 		
         case S_TICHUI:
                 if(Check_up(g_st_SigData.m_HeighRammCm) == 1) 								/*提锤到顶，先拉刹车，后松离合*/  
                 {
-					if(GET_MS_DIFF(s_hang.pvtimer) > 800)			/*间隔至少 0.8秒*/
+					if(GET_MS_DIFF(s_hang.pvtimer) > 1000)			/*间隔至少 1 秒*/
 					{
 						G_LIHE(ACT_OFF,LIHEDLY);
 						G_SHACHE(ACT_ON,0);        					/*先拉刹车*/      
-						*pst = S_CHECK_UPSTOP;
 						s_hang.pvtimer = GET_TICK_MS();
 						STA_CLEAR(s_hang.stop_sta);
+						*pst = S_CHECK_UPSTOP;
 					}
                 }
 				/*****************失速保护  探头失效保护*********************************/
-                if(g_st_SigData.m_SpeedCm < 20)						/*上升时的速度小于20cm/s,视为异常*/
+                if(g_st_SigData.m_SpeedCm < 10)						/*上升时的速度小于10cm/s,视为异常*/
                     s_hang.speederr++;
                 else
 				{
@@ -795,16 +833,16 @@ static SYS_STA hangtu(uint16_t * pst)
 				}
                 if(s_hang.speederr > 2800/HANG_TICK)
                 {
-                     ret = ERR_LIU;
+                     ret = ERR_LS;
                 }
                 /**************************拉力过载保护*********************/
-                tmp = Per2Power(200);	
+                tmp = Per2Power(180);	
                 if(g_st_SigData.m_Power > tmp)
                     s_hang.overpow++;
                 else
                     s_hang.overpow = 0;
                 
-                if(s_hang.overpow > 300)   /*持续1.5秒无法拉锤，显示卡锤故障  2019.10.7*/
+                if(s_hang.overpow > (1500/ HANG_TICK))   /*持续1.5秒无法拉锤，显示卡锤故障  2019.10.7*/
                 {
 					ret |= ERR_KC;
                 } 
@@ -821,6 +859,7 @@ static SYS_STA hangtu(uint16_t * pst)
 				{
 					ret |= ERR_LS;
 				}
+				/**************************提锤超时保护*********************/
 				/***********************************************************/
             break;
         case S_CHECK_UPSTOP:
@@ -832,22 +871,21 @@ static SYS_STA hangtu(uint16_t * pst)
                 s_hang.pvtimer = GET_TICK_MS();
                 *pst = S_XIALIAO;
 			}
-			else if(tmp == 2)
+			else if(tmp > 1)
 			{
-				ret |= ERR_TOP;		/*冲顶保护*/
-			}
-			else if(tmp == 3)		/*刹车异常*/
-			{
-				ret |= ERR_SC;
+				if(tmp == 2) 
+				    ret |= ERR_TOP;		/*冲顶保护*/
+				else
+					ret |= ERR_SC;  /*刹车异常*/	
 			}
             break;
         case S_XIALIAO:                         				/*  下料  */
 			/*提前执行溜放操作*/
-			if(GET_MS_DIFF(s_hang.pvtimer) > (g_sys_para.s_feedtims * 600 - 200))	
+			if(GET_MS_DIFF(s_hang.pvtimer) > (g_sys_para.s_feedtims * 600 - 300))	
 			{
-				s_hang.last_highnum = GetEncoderLen2Cm();	/*溜放时的高度  Terry 2019.7.5*/
+				s_hang.last_highnum = g_st_SigData.m_HeighRammCm;	/*溜放时的高度  Terry 2019.7.5*/
                 G_LIHE(ACT_OFF,0);
-				G_SHACHE(ACT_LIU,0); 
+				G_SHACHE(ACT_LIU,0);                             //提前准备溜放
                 *pst = S_DELAY2;
 			}
             break;
@@ -863,34 +901,30 @@ static SYS_STA hangtu(uint16_t * pst)
             }
             break;
         case S_LIUF:
-			
-            tmp = LiuChkDw(g_st_SigData.m_HeighRammCm,g_st_SigData.m_SpeedCm);   									/*溜放时，检测是否到底了*/
-            if(tmp == HAS_REACH_DOWN)
+            tmp = LiuChkDw(g_st_SigData.m_HeighRammCm,g_st_SigData.m_SpeedCm);   	/*溜放时，检测是否到底了*/
+            if(tmp == HAS_REACH_DOWN)							                    /*判定溜放到底了*/
             {
-				int LPosCm;
-				
-				LPosCm = GetEncoderLen2Cm();
                 s_hang.dachui_cnt = g_sys_para.s_rammcnt;
 				s_record.high = g_sys_para.s_sethighcm / 10;		/*打锤高度  记录单位为分米 Terry 2019.6.5*/
 				s_record.tim = g_sys_para.s_feedtims;				/*送料时间 Terry 2019.6.5*/
 				
                 /*记录当前溜放的深度   */
-                if(LPosCm > -40)  				/*下降深度过小  下降0.5米*/
+                if(g_st_SigData.m_HeighRammCm > -40)  				/*下降深度过小  下降0.4米*/
                 {
                     ret |= ERR_DOWN;  
 					Log_e("溜放过浅");
                 }
                 else
                 {	//更新打锤次数和记录，根据深度判断打锤次数
-					s_record.cnt = s_hang.dachui_cnt =	Get_Hcnt(LPosCm);
-                    s_hang.last_downnum = (int16_t)(LPosCm/10);   				/*本次下降深度 长度 绝对值 Terry 2019.7.5*/
+					s_record.cnt = s_hang.dachui_cnt =	Get_Hcnt(g_st_SigData.m_HeighRammCm);
+                    s_hang.last_downnum = (int16_t)(g_st_SigData.m_HeighRammCm / 10);   				/*本次下降深度 长度 绝对值 Terry 2019.7.5*/
 					
 					Log_e("溜放成功,准备打锤");
                     *pst = S_DACHUI;       										/*开始打锤 */
 					Sig_ResetSta();
 					SIGACT_READY;	/*打锤准备*/
                 }
-            }else if(tmp > 1)       											/*溜放错误*/
+            }else if(tmp > HAS_REACH_DOWN)       											/*溜放错误*/
             {
                 ret |= ERR_DOWN;
 				Log_e("溜放异常  %x",ret);
@@ -898,40 +932,34 @@ static SYS_STA hangtu(uint16_t * pst)
             break;
         case S_DACHUI:
 		    {
-				ERR_SIG sig_err = 0;
+				int sig_err = 0;
 				
-				RecordIn(M_ACT,1);  
-				
-				sig_err = SingleAct(1);
-				if((sig_err > ERR_SIG_REACHDW) ||g_halt)		/*发生错误*/
+				sig_err = SingleAct(1);                 /*打锤操作*/
+				if(sig_err > ERR_SIG_REACHDW)		    /*发生错误*/
 				{
-					Halt_Stop();
 					g_st_SigData.m_Mode = MOD_FREE;
 					Log_e("打锤错误");
-					switch(sig_err)
-					{
-						case ERR_SIG_PULLUP :ret|= ERR_LS;break;
-						case ERR_SIG_ENCODER:ret|= ERR_TT;break;
-						case ERR_SIG_CUR    :ret|= ERR_CT;break;
-						case ERR_SIG_CLING  :ret|= ERR_NC;break;
-						case ERR_SIG_BRAKE  :ret|= ERR_KC;break;
-						case ERR_SIG_TIMOUT :ret|= ERR_CS;break;
-						default:ret|= ERR_CHAO;break;
-					}
+					ret |= ErrChg(sig_err);             /*返回错误状态*/
 				}
 				else
 				{
+				    if(s_SigActStep == e_STEP_PULL)
+						RecordIn(M_ACT,1);
+					else
+						RecordIn(M_ACT,0);
+						
 					if(sig_err == ERR_SIG_REACHDW)
 					{
 						s_hang.dachui_cnt--;
 						Log_e("打锤到底 %d",s_hang.dachui_cnt);
+						s_record.deepth = g_st_SigData.m_Ddeepcm;  
 						if(s_hang.dachui_cnt < 1)
 						{
 							if(s_record.deepth > -50)			/*表示夯土结束  Terry 2019.10.18 */
 							{
 								g_st_SigData.m_Mode = MOD_FREE;	/*直接退出  2019.8.2*/
 								G_SHACHE(ACT_ON,0);
-								G_LIHE(ACT_OFF,200);
+								G_LIHE(ACT_OFF,0);
 								*pst = S_IDLE;
 							}
 							else
@@ -941,28 +969,15 @@ static SYS_STA hangtu(uint16_t * pst)
 							}					
 						}
 					}
-				}
-				if(ret == ERR_NONE)
-				{
-					RecordIn(M_ACT,0);		           /*提锤标志 Terry 2019.7.6*/			
-				}
+				}					
 				break;
+		    }
+	  }
+       /*异常退出时，立即拉刹车，关闭输送带(莫须有)*/
+		if(ret)
+		{
+			*pst = S_IDLE; 
 		}
-	}
-    /*Switch 结束*/
-    if(g_halt)
-    {
-		ret |= ERR_HALT;
-    }
-    /*异常退出时，立即拉刹车，关闭输送带(莫须有)*/
-	if(ret)
-	{
-		g_st_SigData.m_Mode = MOD_FREE; 
-		G_SHACHE(ACT_ON,0);
-		G_LIHE(ACT_OFF,300);					/*2019.8.2添加  Terry*/
-		C_DISCTR();
-		*pst = S_IDLE; 
-	}
     return ret;
 }
 
@@ -970,13 +985,16 @@ static SYS_STA hangtu(uint16_t * pst)
 /************************************************************
   * @brief   检测溜放是否到底
   * @param   LPosCm 当前锤的夯土位置   LSpeedCm 当前速度（向下速度正常为负值）
-  * @return  状态  正常 返回1   异常返回12
+  * @return  HAS_REACH_DOWN    检测到底了
+  *          HAS_REACH_TIMOUT  溜放超时
+  *          HAS_REACH_SPOVER  溜放超速
+  *          0                 正在溜放中
   * @author  Terry
   * @date    2020.2.16
   * @version v1.0
   * @note    最好放在操作系统的系统时钟回调函数中执行
   ***********************************************************/
-SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
+static SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
 {
     static uint32_t last_tim = 0;
     static uint32_t sure_cnt = 0;
@@ -1000,7 +1018,7 @@ SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
                 }
                 if(GET_MS_DIFF(last_tim) > 6000)      							/*6 秒超时没有动作就跳出 2019.8.2*/
                 {
-                    ret = 12;                       							/*锤没有下落故障*/
+                    ret = HAS_REACH_TIMOUT;                       							/*锤没有下落故障*/
                     s_hang.liufang_sta = 3;
                 }		
             }
@@ -1017,9 +1035,9 @@ SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
             
             if(sure_cnt > 1400/HANG_TICK)            	/*确认已经停止  1.4秒  原来0.8秒 */
             {
-				if(s_record.deepth + 400 > LPosCm)		/*假如锤卡在上面，超过4米，就会报警*/
+				if(s_record.deepth + 450 > LPosCm)		/*假如锤卡在上面，超过4米，就会报警*/
 				{
-					ret = 1;
+					ret = HAS_REACH_DOWN;
 					s_hang.liufang_sta = 3;             /*正常 跳出判断*/
 				}
 				else
@@ -1027,15 +1045,19 @@ SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
 					sure_cnt = 0;							/*重新开始累积*/
 					if(GET_MS_DIFF(last_tim) > 4000)		/*最多再等待4秒*/
 					{
-						ret = 12;                       	/*锤没有下落故障,没有下落到底的故障 2019.11.16*/
+						ret = HAS_REACH_TIMOUT;             /*锤没有下落故障,没有下落到底的故障 2019.11.16*/
 						s_hang.liufang_sta = 3;
 					}
 				}
             } 
 			/*超速报警*/
-			if(LSpeedCm < -800)								/*下降速度超过6米/秒时，持续1秒，将抱溜放异常错误 2019.12.08*/
+			if(LSpeedCm < -700)								/*下降速度超过6米/秒时，持续1秒，将抱溜放异常错误 2019.12.08*/
 			{
 				speed_over++;
+				if(speed_over > 1000/HANG_TICK)
+				{
+					ret = HAS_REACH_SPOVER;									/*下降速度过快报警*/
+				}
 			}
 			else
 			{
@@ -1043,15 +1065,11 @@ SYS_STA LiuChkDw(int LPosCm,int LSpeedCm)
 					speed_over -= 4;
 			}
 			
-			if(speed_over > 1000/HANG_TICK)
-			{
-				ret = 12;									/*下降速度过快报警*/
-			}	
             break;
         case 3:												/*结束*/
             break;
         default:
-            s_hang.liufang_sta = 3;
+            s_hang.liufang_sta = 2;
             break;
     }
     return ret;

@@ -148,6 +148,8 @@ void MX_GPIO_Init(void)
 	BUZZER(0);
 	C_AS1_DS();
     C_AS2_DS();
+	C_STOP();
+	
     
 }
 
