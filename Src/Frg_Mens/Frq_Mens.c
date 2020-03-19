@@ -34,6 +34,8 @@ typedef struct
 	uint32_t time_high;
 }FRQ_MENS;
 
+
+/*电能芯片捕获相关寄存器*/
 static uint32_t T_lastval,T_preval;
 static FRQ_MENS frg_mens;
 
@@ -118,7 +120,6 @@ void ICOverLoadIRQ(void)
 	tmp.tim_H = frg_mens.time_high;
 	
 	stim = Frg_Tim_Diff(frg_mens.pre_tim,tmp);
-	
 	/*over time check ,when lost pulse*/
 	if( stim > MAX_TIMUS) 
 	{	
@@ -135,11 +136,7 @@ void ICOverLoadIRQ(void)
 		
 		frg_mens.pre_tim = frg_mens.last_tim;
 		
-//		Log_e("over");
-	}
-	else
-	{
-//		Log_e("IC %d  %d",T_preval,stim);
+		Log_e("power lost over");
 	}
 }
 

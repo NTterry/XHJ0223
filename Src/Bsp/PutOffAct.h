@@ -4,9 +4,9 @@
 #ifndef _PUT_OFF_ACT_H_
 #define _PUT_OFF_ACT_H_
 #include "stm32f1xx_hal.h"
+#include "action.h"
 
-
-#define T_ACT_MS			5
+#define T_ACT_MS			CALUTICK
 
 /*¶¯×÷×´Ì¬*/
 #define ACT_DEF	3
@@ -50,7 +50,7 @@ enum SC
 
 void G_LIHE(uint32_t sta, uint32_t delay);
 void G_SHACHE(uint32_t sta, uint32_t delay);
-void G_ActPoll_10ms(void);
+void G_ActPoll_T(void);
 void Lihe_Generate_PWM(void);
 #endif
 

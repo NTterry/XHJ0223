@@ -55,7 +55,7 @@ static ENCODER  Encoder1Data;
 
 static inline void EncoderCacuMs(void);
 static void EncoderExti(void);
-static int s_start_flag = 0;
+static int s_start_flag = 0;			/*定时器启动标志，防止提前进入中断*/
 static int s_dir_flag = 0;
 
 /**********************外部调用接口*****************************/

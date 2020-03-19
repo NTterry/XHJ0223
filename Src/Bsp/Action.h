@@ -13,7 +13,8 @@ Date		:2015.06.01  - 2017.02.11
 #include "config.h"
 #include "tim.h"
 
-#define CALUTICK				5					//40毫秒一次
+
+#define CALUTICK				5					//5毫秒一次
 #define SHACHEDLY				(800)
 #define LIHEDLY         		(320)    /*0.3秒*/
 #define ERRDLY					500

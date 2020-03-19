@@ -83,7 +83,15 @@ void G_SHACHE(uint32_t sta, uint32_t delay)
 }
 
 
-/* 离合动作   如果延时为0时，立即执行*/
+/* */
+/********************************************************
+Function	: G_LIHE
+Description	: 离合延时动作   如果延时为0时，立即执行
+Input		: sta   动作指令
+            ：delay 延时时间
+Return		: None
+Others		: 1ms 中断中调用
+*********************************************************/
 void G_LIHE(uint32_t sta, uint32_t delay)
 {
 	g_alihe.delay = delay / T_ACT_MS;
@@ -102,12 +110,17 @@ void G_LIHE(uint32_t sta, uint32_t delay)
 		C_SONGLIHE();
 #else
 		LiheRLY = sta;
-		
 #endif
 	}	
 }
 
-
+/********************************************************
+Function	: Lihe_Generate_PWM  
+Description	: PWM输出离合控制信号,大力 gLiheRatio = 10  和 小力 gLiheRatio = 5
+Input		: None
+Return		: None
+Others		: 1ms 中断中调用
+*********************************************************/
 void Lihe_Generate_PWM(void)
 {
 #ifdef USE_LIHE_PWM
@@ -127,7 +140,13 @@ void Lihe_Generate_PWM(void)
 #endif
 }
 
-
+/********************************************************
+Function	: Shache_Proc  
+Description	: 根据控制指令，执行刹车控制信号输出，松刹车 拉刹车 溜放等
+Input		: None
+Return		: LED指示灯信息
+Others		: None
+*********************************************************/
 static uint16_t Shache_Proc(void)
 {
     static uint32_t sctime;
@@ -167,7 +186,7 @@ static uint16_t Shache_Proc(void)
             C_SNZ();
             C_AS1_EN();
             C_AS2_EN();
-            if(HAL_MS_DIFF(sctime) > 5000)				/*刹车抱刹制动时间*/
+            if(HAL_MS_DIFF(sctime) > 6000)				/*刹车抱刹制动时间*/
 				sact = S_SONG2;
 			
 			if(g_shache.pact == ACT_ON)
@@ -201,7 +220,7 @@ static uint16_t Shache_Proc(void)
 
 
 /**
-  * 函数功能 外部执行离合 和刹车 操作
+  * 函数功能 外部执行离合 和刹车 延时执行操作
   * 输入参数： 无
 
   * 返回值: 无
@@ -217,22 +236,21 @@ static void g_action(void)
     else
     {
         g_alihe.delay = 0;
-
         if(g_alihe.sta == ACT_OFF)
         {
            				//每10ms确认一次
 #ifndef USE_LIHE_PWM
-		 C_SONGLIHE();
+			C_SONGLIHE();
 #else
-		LiheRLY = ACT_OFF;
+			LiheRLY = ACT_OFF;
 #endif
         }
         else
         {
 #ifndef USE_LIHE_PWM
-		C_LALIHE();
+			C_LALIHE();
 #else
-		LiheRLY = ACT_ON;
+			LiheRLY = ACT_ON;
 #endif
         }
     }
@@ -266,8 +284,14 @@ static void g_action(void)
 #endif
 }
 
-/*Called by Timer as 10ms*/
-void G_ActPoll_10ms(void)
+/********************************************************
+Function	: G_ActPoll_T  
+Description	: 定时器中断调用，离合和刹车信号的顺序执行  执行周期 CALUTICK毫秒
+Input		: None
+Return		: None
+Others		: None
+*********************************************************/
+void G_ActPoll_T(void)
 {
 	g_action();
 #ifdef USE_LIUF
@@ -275,12 +299,13 @@ void G_ActPoll_10ms(void)
 #endif
 }
 
-void Pf_Lihe_Init(void)
-{
-	g_alihe.delay = 10;
-	g_alihe.sta = ACT_OFF;
-}
-
+/********************************************************
+Function	: Pf_Shache_Init
+Description	: 刹车信号上电初始化
+Input		: None
+Return		: None
+Others		: None
+*********************************************************/
 void Pf_Shache_Init(void)
 {
 	g_shache.delay = 10;

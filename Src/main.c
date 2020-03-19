@@ -119,12 +119,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  
-  MX_TIM2_Init();                   //电能芯片计数
+ 
   MX_TIM3_Init();                   //定时器测量电能计数
   MX_USART3_UART_Init();			//刹车板通信
   
-  MX_I2C2_Init();
+  MX_I2C2_Init();					//EEPROM处理
   HwEcInit();						//编码器引脚初始化
   /* Call init function for freertos objects (in freertos.c) */
   MX_FREERTOS_Init();
@@ -133,8 +132,6 @@ int main(void)
   osKernelStart();
   
   /* We should never get here as control is now taken by the scheduler */
-  
-
   /* USER CODE BEGIN 3 */
   /* Infinite loop */
   while (1)

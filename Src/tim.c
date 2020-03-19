@@ -42,27 +42,21 @@
 #include "Frq_Mens.h"
 
 /* USER CODE BEGIN 0 */
-struct EtrCnt sys_Etrcnt;
-//struct EncoderCnt sys_encoder,ht_encoder;  /*ht_encoder 增加夯土专用判断的计数器,夯土时会单独清零*/
-/*ht_encoder 只是硬件技术，不含实际方向*/
-//void UserEncode(uint8_t dir, struct Locationcm *p);
-//struct Locationcm user_encoder;            /*用户的编码信号  单位 厘米*/
 /* USER CODE END 0 */
 
-TIM_HandleTypeDef htim2;	/*外部脉冲计数*/
+TIM_HandleTypeDef htim2;	/*捕获模式测量电能芯片的频率*/
 TIM_HandleTypeDef htim3;	/*25ms定时器中断*/
 TIM_HandleTypeDef htim4;	/*编码器模式*/
 
 
-/* TIM2 init function 外部脉冲计数器，电能信号的检测*/
+/* 捕获模式测量电能芯片的频率*/
 void MX_TIM2_Init(void)
 {
- 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_IC_InitTypeDef sConfigIC = {0};
 
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 719;
+  htim2.Init.Prescaler = 719;    //10us Tick
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = TIM_PREIOD - 1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -89,6 +83,9 @@ void MX_TIM2_Init(void)
   
   HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
 }
+
+
+
 
 void HAL_TIM_IC_MspInit(TIM_HandleTypeDef* tim_icHandle)
 {
@@ -121,7 +118,7 @@ void HAL_TIM_IC_MspInit(TIM_HandleTypeDef* tim_icHandle)
 }
 
 
-/* TIM3 init function  25ms定时器，计算电能  更新编码计数*/
+/* TIM3 init function  定时器中断*/
 void MX_TIM3_Init(void)
 {
   TIM_ClockConfigTypeDef sClockSourceConfig;
@@ -298,8 +295,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 	if(htim->Instance == TIM2)
 	{
-//		Log_e("tim2");
-		ICOverLoadIRQ();
+		ICOverLoadIRQ();    //电能芯片捕获定时器溢出中断
 	}
 }
 

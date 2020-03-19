@@ -477,7 +477,7 @@ void Key_HighDwL(void)
 void Key_LiheUp(void)
 {
 	IOT_FUNC_ENTRY;
-	if(g_GuiData.g_lihe < (g_GuiData.g_sethighcm - 6))
+	if(g_GuiData.g_lihe < (g_GuiData.g_sethighcm))
 	{
 		if(g_GuiData.g_lihe < -10)
 			g_GuiData.g_lihe +=4;   //为负数是，多增加一些时间

@@ -11,6 +11,7 @@
 #define GET_TICK_MS()  osKernelSysTick()
 #define DELAYMS(x)	   osDelay(x)
 
+/*溜放状态判断*/
 #define HAS_REACH_DOWN		1
 #define HAS_REACH_TIMOUT	2
 #define HAS_REACH_SPOVER	3
@@ -29,8 +30,8 @@ static SYS_STA hangtu(uint16_t * pst);
 提锤  下料  溜放   打锤
 */
 
-struct HANGTU s_hang;                                   /*夯土流程状态检测*/
-struct RECORD s_record;									/*待上传的数据*/
+static struct HANGTU s_hang;                                   /*夯土流程状态检测*/
+static struct RECORD s_record;									/*待上传的数据*/
 struct SYSATTR g_sys_para;								// 系统参数
 
 
@@ -353,7 +354,6 @@ void EXT_BUTTON_CHK(void)
 					Log_e("ACT_ON");
 				}
 			}
-			
 			if(b_liu == 0xff)
 			{
 				if(liu_flg <= 0)
@@ -385,7 +385,7 @@ void EXT_BUTTON_CHK(void)
 	}
 }
 
-
+/*单步打桩的动作*/
 static enum {
 	e_STEP_READY,
 	e_STEP_STUDY,
@@ -431,7 +431,7 @@ int SingleAct(int mode)
 		else
 			s_SigActStep = e_STEP_STUDY;	
 			
-		Sig_ResetSta();
+		Sig_ResetSta();   //初始化下一步动作状态
 		break;
 	case e_STEP_STUDY:
 		ret = Sig_StudyUp();
@@ -1169,8 +1169,11 @@ void sysattr_init(uint16_t flg)
 	/*离合刹车动作初始化*/
 	G_LIHE(ACT_OFF,0);
     G_SHACHE(ACT_ON,0);         						//初始为拉刹车        2018.12.24 Terry
-    Enc_Set_Dir(g_sys_para.s_dir);
+    Enc_Set_Dir(g_sys_para.s_dir);						//初始化编码器方向
 	g_st_SigData.m_Mode = MOD_FREE;						//上电后保持空闲模式
+	
+	g_sys_para.s_setlihecm = g_sys_para.s_sethighcm * 5 / 6;     //初始化离合高度为提锤高度的5/6
 }
 
 
+/****************************************end Hangtu,c**********************************************/

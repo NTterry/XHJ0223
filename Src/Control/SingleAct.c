@@ -44,7 +44,7 @@ void GetLiveData(void)
 /*
 	work up check  if proper taking up
 	return if it back to normal
-	提锤发生下滑检测
+	提锤时发生下滑检测
 */
 static ERR_SIG BreakOff_Check(int power,int speedcm)
 {
@@ -132,7 +132,7 @@ static int Stuck_Ckeck(int power,int speedcm)
 
 
 /************************************************************
-  * @brief   初始化为Reset 状态
+  * @brief   初始化为Reset 状态,idle状态设置
   * @param   none
   * @return  状态
   * @author  Terry
@@ -181,6 +181,7 @@ ERR_SIG Sig_TakeUp(void)
 			ClrNullCnt = 0;
 			Sta_SigTakeUp = SIG_PULL_CLUTCH;
 			break;
+			
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0); 										/*先直接小力拉离合*/
 			G_SHACHE(ACT_OFF,BRAKE_DLY400);
@@ -189,7 +190,6 @@ ERR_SIG Sig_TakeUp(void)
 			gLiheRatio = LIHE_TINY;	
 #endif
 			SET_TIME; 
-			LPrint("Pull \r\n");
 			Sta_SigTakeUp = SIG_PULL_HOLD;
 			break;
 		
@@ -218,7 +218,7 @@ ERR_SIG Sig_TakeUp(void)
 				                               (g_st_SigData.m_HeightShowCm > 50))		/*超过50公分后，取消清零*/
 			{
 				Sta_Stuck = 0;		/* 下一环节的判断状态清零 */
-				Sta_Break = 0;		/* 超溜检测 */
+				Sta_Break = 0;		/* 超溜检测               */
 				Log_e("Clr %d  %d",g_st_SigData.m_HeightShowCm,g_st_SigData.m_SpeedCm);
 				StartTim = SET_TIME;
 				Sta_SigTakeUp = SIG_WORKUP;
@@ -293,6 +293,9 @@ ERR_SIG Sig_TakeUp(void)
 				G_LIHE(ACT_OFF,200);
 				G_SHACHE(ACT_ON,0);
 				SET_TIME;
+#ifdef USE_LIHE_PWM
+				gLiheRatio = LIHE_BIG;	  //检测到堵转后，直接改为大拉力
+#endif     
 			}
 			
 			if(LAST_TIME > (StartTim + PullUpTimeMax()))   // if Timeout
@@ -303,7 +306,7 @@ ERR_SIG Sig_TakeUp(void)
 			break;
 		
 		case SIG_REACH_TOP:							/*成功提锤到顶*/
-			err_sta = ERR_SIG_REACHUP;
+			err_sta = ERR_SIG_REACHUP;                     //Terry add 2020.3.18
 			break;
 		
 		case SIG_BLOCKED:
@@ -373,7 +376,7 @@ ERR_SIG Sig_StudyUp(void)
 			if(g_st_SigData.m_SpeedCm > VALID_MIN_CM)    	//检测到速度有效
 			{
 				dir_sure++;
-				if(dir_sure > 300/HANG_TICK)     //连续方向检测确认  0.3秒
+				if(dir_sure > 300/HANG_TICK)     			//连续方向检测确认  0.3秒
 				{
 					Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 				}
@@ -564,6 +567,9 @@ ERR_SIG Sig_LandDw(void)
 			if(g_st_SigData.m_HeightShowCm < g_st_SigData.m_Lihenew)    //与更新后离合点的高度比较
 			{
 				err_dw = ERR_SIG_REACHDW;
+			#ifdef USE_LIHE_PWM
+			gLiheRatio = LIHE_TINY;			//Terry add 2020.3.18  
+			#endif
 				Log_e("ERR_SIG_REACHDW");
 			}
 			if(CHECK_TIMEOUT(6000))       /*该时间需要继续判断*/

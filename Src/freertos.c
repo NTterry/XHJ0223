@@ -116,7 +116,7 @@ void MX_FREERTOS_Init() {
 /*÷¥––÷‹∆⁄ CALUTICK ∫¡√Î*/
 void Timer3_CallBack(void)
 {
-	G_ActPoll_10ms();
+	G_ActPoll_T();
 }
 
 /* StartTask03 function 
