@@ -186,7 +186,7 @@ static uint16_t Shache_Proc(void)
             C_SNZ();
             C_AS1_EN();
             C_AS2_EN();
-            if(HAL_MS_DIFF(sctime) > 6000)				/*刹车抱刹制动时间*/
+            if(HAL_MS_DIFF(sctime) > 7000)				/*刹车抱刹制动时间*/
 				sact = S_SONG2;
 			
 			if(g_shache.pact == ACT_ON)
