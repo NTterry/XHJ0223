@@ -310,7 +310,9 @@ void EXT_BUTTON_CHK(void)
 	{
 		g_st_SigData.m_ghalt = 1;
 	}
-		
+	if((g_st_SigData.m_Mode == MOD_SIGACT) ||(g_st_SigData.m_Mode == MOD_AUTOTAMP)||g_st_SigData.m_errshow)    //错误状态，不允许测试
+		return;
+	
 	if(b_Dd > 0xFFF)
 	{
 		IOT_FUNC_ENTRY;
@@ -329,7 +331,7 @@ void EXT_BUTTON_CHK(void)
 		{
 			g_st_SigData.m_Mode = MOD_TST;
 		}
-		if(g_st_SigData.m_Mode == MOD_TST)   //只有进入测试模式下，才能手动操作，避免自动工作时误操作
+		else if(g_st_SigData.m_Mode == MOD_TST)   //只有进入测试模式下，才能手动操作，避免自动工作时误操作
 		{
 			if(k_Cluch == 0xFF)
 				G_LIHE(ACT_ON,0);
@@ -520,6 +522,7 @@ SYS_STA ServicesLoop(void)
 			if(g_st_SigData.m_ghalt == 0)
 				g_st_SigData.m_errshow = ERR_NONE;   //急停状态不保存
 		}
+		Halt_Stop(0);			//故障时，直接停机
 		return 0;
 	}
 	C_OK();

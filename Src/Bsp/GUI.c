@@ -313,7 +313,7 @@ void GUI_showdata(void)
 			}
 			else
 			{
-				Dsp_Num(VERSION,0,LEDCODE[12]);			//版本号    2019.1.2
+				Dsp_Num(VERSION,0,LEDCODE[15]);			//版本号    2019.1.2
 				
 			}
 		}
@@ -417,6 +417,11 @@ void CmdProc(void)
 void Key_HighUp(void)
 {
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_sethighcm < g_sys_para.s_maxhigh)   /*最高12米  Terry  2019.5.21*/
 	{
 		g_GuiData.g_sethighcm += PER_HIGH;
@@ -430,6 +435,11 @@ void Key_HighUp(void)
 void Key_HighUpL(void)
 {
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_sethighcm < g_sys_para.s_maxhigh)   /*最高12米  Terry  2019.5.21*/
 	{
 		g_GuiData.g_sethighcm += PER_HIGH * 10;
@@ -442,6 +452,11 @@ void Key_HighUpL(void)
 void Key_HighDw(void)
 {
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_sethighcm > MINSET_HIGH)   /* 最小1米  Terry  2019.5,21*/
 	{
 		g_GuiData.g_sethighcm -= PER_HIGH;		//高度减小10cm
@@ -458,6 +473,11 @@ void Key_HighDw(void)
 void Key_HighDwL(void)
 {	
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_sethighcm > MINSET_HIGH)   /* 最小1米  Terry  2019.5,21*/
 	{
 		g_GuiData.g_sethighcm -= PER_HIGH * 10;		//高度减小10cm
@@ -477,6 +497,11 @@ void Key_HighDwL(void)
 void Key_LiheUp(void)
 {
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_lihe < (g_GuiData.g_sethighcm))
 	{
 		if(g_GuiData.g_lihe < -10)
@@ -493,6 +518,11 @@ void Key_LiheUp(void)
 void Key_LiheUpL(void)
 {
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_lihe < (g_GuiData.g_sethighcm - 6))
 	{
 		if(g_GuiData.g_lihe < -10)
@@ -510,6 +540,11 @@ void Key_LiheUpL(void)
 void Key_LiheDw(void)
 {
 	IOT_FUNC_ENTRY;
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}
 	if(g_GuiData.g_lihe > -200)		
 	{
 		if(g_GuiData.g_lihe < -10)
@@ -525,7 +560,11 @@ void Key_LiheDw(void)
 void Key_LiheDwL(void)
 {
 	IOT_FUNC_ENTRY;
-	
+	if(g_GuiData.g_index != SHOW_NONE)
+	{
+		g_GuiData.g_index = SHOW_NONE;
+		return;
+	}	
 	if(g_GuiData.g_lihe > -200)		
 	{
 		if(g_GuiData.g_lihe < -10)

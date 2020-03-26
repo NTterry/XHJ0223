@@ -7,7 +7,7 @@
 #include "stdint.h"
 
 #define VALID_MIN_CM		10				// Mininum Speed 0.1m/s    ºÏ≤‚„–÷µ
-#define BRAKE_DLY400		400
+#define BRAKE_DLY400		300
 #define VALID_POWH			70
 #define VALID_POWM			50
 #define VALID_POWL			30
