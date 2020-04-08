@@ -62,7 +62,7 @@ static ERR_SIG BreakOff_Check(int power,int speedcm)
 		case 1:
 			if(speedcm < 0)
 			{
-				if(CHECK_TIMEOUT(1200))  //持续 1.2 秒
+				if(CHECK_TIMEOUT(2000))  //持续 1.2 秒
 				{
 					if(power > Per2Power(VALID_POWM))
 						ret = ERR_SIG_PULLUP;
@@ -91,34 +91,35 @@ static int Stuck_Ckeck(int power,int speedcm)
 	switch(Sta_Stuck)
 	{
 		case 0:
-		    if(power > Per2Power(200))
+		    if((power > Per2Power(300)) && (speedcm < VALID_MIN_CM))
 			{
 				Sta_Stuck = 2;
 				SET_TIME;
 			}
-			else if(power > Per2Power(VALID_POWOVER) && ((speedcm) > VALID_MIN_CM))
+			else if(power > Per2Power(250) && ((speedcm) < VALID_MIN_CM))
 			{
 				Sta_Stuck = 1;
 				SET_TIME;
 			}
 			break;
 		case 1:                  
-			if(power < Per2Power(130))
+			if(power < Per2Power(150))  //原来130%
 			{
 				Sta_Stuck = 0;
 			}
-			if(CHECK_TIMEOUT(2000))
+			if(CHECK_TIMEOUT(4000))
 			{
 				Sta_Stuck = 0;		// error
 				ret = 1;            //卡锤了
 			}
 			break;
 		case 2:
-			if(power < Per2Power(130) && ((speedcm) > VALID_MIN_CM))
+			if(power < Per2Power(300) || ((speedcm) > VALID_MIN_CM))   //  Terry 改 2020.4.7
 			{
 				Sta_Stuck = 0;
+				SET_TIME;
 			}
-			if(CHECK_TIMEOUT(1000))   /*严重卡锤了*/
+			if(CHECK_TIMEOUT(3000))   /*严重卡锤了*/
 			{
 				Sta_Stuck = 0;  	// error
 				ret = 2;
@@ -150,8 +151,8 @@ int PullUpTimeMax(void)
 {
 	int tim;
 	
-	tim = g_sys_para.s_sethighcm * 20;    //预设提锤速度0.5米/秒，要小于实际速度
-	tim += 2000;						  //预留两秒超时时间
+	tim = g_sys_para.s_sethighcm * 30;    //预设提锤速度0.5米/秒，要小于实际速度
+	tim += 3000;						  //预留两秒超时时间
 	
 	return tim;
 }
@@ -185,7 +186,7 @@ ERR_SIG Sig_TakeUp(void)
 		case SIG_PULL_CLUTCH:
 			G_LIHE(ACT_ON,0); 										/*先直接小力拉离合*/
 			G_SHACHE(ACT_OFF,BRAKE_DLY400);
-			
+			StuckCnt = 0;
 #ifdef USE_LIHE_PWM
 			gLiheRatio = LIHE_TINY;	
 #endif
@@ -202,12 +203,17 @@ ERR_SIG Sig_TakeUp(void)
 				StartTim = SET_TIME;
 				Sta_SigTakeUp = SIG_WAIT_VALID_UP;
 			}
-			if(CHECK_TIMEOUT(5000) || (g_st_SigData.m_HeightShowCm < -300))  /*超时检测,和下降异常检测，松3米认为异常*/
+			if(CHECK_TIMEOUT(7000) || (g_st_SigData.m_HeightShowCm < -300))  /*超时检测,和下降异常检测，松3米认为异常*/
 			{
 				if(g_st_SigData.m_Power < Per2Power(VALID_POWL))
 					err_sta = ERR_SIG_CUR;
 				else if(g_st_SigData.m_SpeedCm < VALID_MIN_CM)
-					err_sta = ERR_SIG_ENCODER;
+				{
+					if(g_st_SigData.m_Power >  Per2Power(VALID_POWOVER))
+						err_sta = ERR_SIG_PULLUP;
+					else
+						err_sta = ERR_SIG_ENCODER;
+				}
 				else
 					err_sta = ERR_SIG_TIMOUT;
 			}
@@ -247,14 +253,19 @@ ERR_SIG Sig_TakeUp(void)
 				ClrNullCnt = 0;
 			}
 			/*等待时间过长，判定为异常故障*/
-			if(((LAST_TIME - StartTim) > 4000) || (g_st_SigData.m_HeightShowCm < -300))	   // need add pull
+			if(((LAST_TIME - StartTim) > 7000) || (g_st_SigData.m_HeightShowCm < -300))	   // need add pull
 			{
 				if(g_st_SigData.m_Power < Per2Power(VALID_POWM))
 					err_sta = ERR_SIG_CUR;
 				else if(g_st_SigData.m_SpeedCm < VALID_MIN_CM)
-					err_sta = ERR_SIG_ENCODER;
+				{
+					if(g_st_SigData.m_Power >  Per2Power(200))
+						err_sta = ERR_SIG_PULLUP;
+					else
+						err_sta = ERR_SIG_ENCODER;
+				}
 				else
-					err_sta = ERR_SIG_PULLUP;
+					err_sta = ERR_SIG_TIMOUT;
 					
 				Log_e("Takeup Err %d",err_sta);
 			}
@@ -310,10 +321,10 @@ ERR_SIG Sig_TakeUp(void)
 			break;
 		
 		case SIG_BLOCKED:
-			if(CHECK_TIMEOUT(500))
+			if(CHECK_TIMEOUT(600))
 			{
 				StuckCnt++;
-				if(StuckCnt < 3)
+				if(StuckCnt < 5)
 				{
 					G_LIHE(ACT_ON,0);
 					G_SHACHE(ACT_OFF,200);
@@ -322,7 +333,7 @@ ERR_SIG Sig_TakeUp(void)
 				}
 				else
 				{
-					err_sta = ERR_SIG_BRAKE;
+					err_sta = ERR_SIG_PULLUP;
 					Log_e("ERR_SIG_BRAKE");
 				}
 			}
@@ -552,12 +563,12 @@ ERR_SIG Sig_LandDw(void)
 			{
 				if(g_st_SigData.m_Power > Per2Power(140))
 				{
-					err_dw = ERR_SIG_CLING;
+					err_dw = ERR_SIG_PULLUP;
 					Log_e("ERR_SIG_CLING");
 				}
 				else
 				{
-					err_dw = ERR_SIG_BRAKE;
+					err_dw = ERR_SIG_CLING;
 					Log_e("ERR_SIG_BRAKE");
 				}
 			}

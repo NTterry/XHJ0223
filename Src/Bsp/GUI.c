@@ -9,7 +9,7 @@
 #include "keyboard.h"
 #include "SingleAct.h"
 
-#define VERSION     20     					/*版本号 C97  2019.9.17*/
+#define VERSION     22     					/*版本号 C97  2019.9.17*/
 
 #define MUNEDELAY   200						/*菜单自动回复延时 约 30秒*/
 
@@ -628,7 +628,7 @@ void Key_Add(void)
 				g_GuiData.g_HasChanged = 1;
 			}break;
 		case SHOW_CNT:                             /*Terry add 2019.*/
-			if(g_GuiData.g_hcnt < 10)
+			if(g_GuiData.g_hcnt < 12)
 			{
 				g_GuiData.g_hcnt++;
 				g_GuiData.g_HasChanged = 1;
@@ -674,11 +674,21 @@ void Key_Sub(void)
 					g_GuiData.g_ts--;
 					g_GuiData.g_HasChanged = 1;
 				}
+				if(g_GuiData.g_ts > 20)
+				{
+					g_GuiData.g_ts = 20;
+					g_GuiData.g_HasChanged = 1;
+				}
 				break;
 			case SHOW_CNT:                      /*Terry add*/
 				if(g_GuiData.g_hcnt > 3)
 				{
 					g_GuiData.g_hcnt--;
+					g_GuiData.g_HasChanged = 1;
+				}
+				if(g_GuiData.g_hcnt > 12)
+				{
+					g_GuiData.g_hcnt = 12;
 					g_GuiData.g_HasChanged = 1;
 				}
 				break;
@@ -734,6 +744,7 @@ void Key_Start(void)
 	}
 	IOT_FUNC_ENTRY;
 }
+extern void Enc_Clr_TotalCnt1(void);
 
 void Key_ZD_Long(void)
 {
@@ -743,7 +754,7 @@ void Key_ZD_Long(void)
 			g_st_SigData.m_Mode = MOD_SIGACT;     /*进入自动打锤模式*/
 		else
 			g_st_SigData.m_Mode = MOD_AUTOTAMP;
-		
+		Enc_Clr_TotalCnt1();
 		g_st_SigData.m_eibutton = 1;             /*不带学习的模式*/
 	}
 }

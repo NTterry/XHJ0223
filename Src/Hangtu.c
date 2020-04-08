@@ -312,6 +312,9 @@ void EXT_BUTTON_CHK(void)
 	}
 	if((g_st_SigData.m_Mode == MOD_SIGACT) ||(g_st_SigData.m_Mode == MOD_AUTOTAMP)||g_st_SigData.m_errshow)    //错误状态，不允许测试
 		return;
+		
+	if(g_st_SigData.m_ghalt)
+		return;
 	
 	if(b_Dd > 0xFFF)
 	{
@@ -481,7 +484,7 @@ static SYS_STA ErrChg(int sigerr)
 	
 	switch(sigerr)
 	{
-		case ERR_SIG_PULLUP :sret|= ERR_LS;break;
+		case ERR_SIG_PULLUP :sret|= ERR_KC;break;
 		case ERR_SIG_ENCODER:sret|= ERR_TT;break;
 		case ERR_SIG_CUR    :sret|= ERR_CT;break;
 		case ERR_SIG_CLING  :sret|= ERR_NC;break;
@@ -840,7 +843,7 @@ static SYS_STA hangtu(uint16_t * pst)
                      ret = ERR_LS;
                 }
                 /**************************拉力过载保护*********************/
-                tmp = Per2Power(180);	
+                tmp = Per2Power(200);	    //原来 180%
                 if(g_st_SigData.m_Power > tmp)
                     s_hang.overpow++;
                 else
@@ -927,6 +930,7 @@ static SYS_STA hangtu(uint16_t * pst)
                     *pst = S_DACHUI;       										/*开始打锤 */
 					Sig_ResetSta();
 					SIGACT_READY;	/*打锤准备*/
+					Enc_Clr_TotalCnt1();                                        //2020.4.5 修改
                 }
             }else if(tmp > HAS_REACH_DOWN)       											/*溜放错误*/
             {
